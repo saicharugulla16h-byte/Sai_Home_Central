@@ -1687,7 +1687,10 @@ function schedulePush(){
 async function pushToSupabase(){
   if(!S.supabaseUrl||!S.supabaseKey)return;
   setSyncStatus('syncing');
-  var payload={user_id:S.currentUser,data:JSON.stringify(S.users[S.currentUser]),updated_at:new Date().toISOString()};
+  // Include photo URL in saved data so other devices can restore it
+  var userData=JSON.parse(JSON.stringify(S.users[S.currentUser]));
+  userData.photoUrl=S.photos[S.currentUser]||'';
+  var payload={user_id:S.currentUser,data:JSON.stringify(userData),updated_at:new Date().toISOString()};
   try{
     var r=await fetch(S.supabaseUrl+'/rest/v1/habit_data',{
       method:'POST',
@@ -1703,20 +1706,41 @@ async function syncFromSupabase(){
   if(!S.supabaseUrl||!S.supabaseKey)return;
   setSyncStatus('syncing');
   try{
-    var r=await fetch(S.supabaseUrl+'/rest/v1/habit_data?user_id=eq.'+S.currentUser+'&select=data',{
+    // Fetch both users' data in one call
+    var r=await fetch(S.supabaseUrl+'/rest/v1/habit_data?select=user_id,data',{
       headers:{'apikey':S.supabaseKey,'Authorization':'Bearer '+S.supabaseKey}
     });
     var rows=await r.json();
     if(rows&&rows.length){
-      var remote=JSON.parse(rows[0].data);
-      var local=S.users[S.currentUser];
-      Object.keys(remote.completions||{}).forEach(function(k){
-        if(!local.completions[k]||remote.completions[k].length>local.completions[k].length)
-          local.completions[k]=remote.completions[k];
+      rows.forEach(function(row){
+        var uid=row.user_id;
+        if(!S.users[uid])return;
+        try{
+          var remote=JSON.parse(row.data);
+          var local=S.users[uid];
+          // Merge completions
+          Object.keys(remote.completions||{}).forEach(function(k){
+            if(!local.completions[k]||remote.completions[k].length>local.completions[k].length)
+              local.completions[k]=remote.completions[k];
+          });
+          // Merge notes
+          Object.keys(remote.notes||{}).forEach(function(k){
+            if(!local.notes[k])local.notes[k]=remote.notes[k];
+          });
+          // Merge habits
+          if(remote.habits&&remote.habits.length>=local.habits.length)
+            local.habits=remote.habits;
+          // Restore photo URL — key fix for cross-device photos
+          if(remote.photoUrl&&remote.photoUrl.startsWith('http')){
+            S.photos[uid]=remote.photoUrl;
+            try{localStorage.setItem('dh_photourl_'+uid,remote.photoUrl);}catch(ex){}
+          }
+        }catch(ex){}
       });
-      Object.keys(remote.notes||{}).forEach(function(k){if(!local.notes[k])local.notes[k]=remote.notes[k];});
-      if(remote.habits&&remote.habits.length>=local.habits.length)local.habits=remote.habits;
-      saveS();renderAll();
+      saveS();
+      updateAvatars();
+      if(S.currentUser)updateHeaderAvatar();
+      renderAll();
     }
     setSyncStatus('ok');
   }catch(e){setSyncStatus('err');}
