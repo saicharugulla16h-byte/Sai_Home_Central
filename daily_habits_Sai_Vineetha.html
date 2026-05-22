@@ -334,6 +334,13 @@ textarea{resize:none;height:70px}
 /* ── TOAST ── */
 .toast{padding:11px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;margin-bottom:8px;box-shadow:0 4px 20px rgba(0,0,0,.3)}
 .empty{text-align:center;padding:30px 20px;color:var(--text3);font-size:14px;line-height:1.6}
+.metric-row{display:flex;align-items:center;gap:8px;padding:8px 14px 12px;border-top:1px solid var(--border);background:var(--surface2)}
+.metric-input{width:68px;text-align:center;padding:6px 8px;font-size:15px;font-weight:600;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);-webkit-appearance:none}
+.metric-input:focus{border-color:var(--interactive);outline:none}
+.metric-target{font-size:13px;color:var(--text3);white-space:nowrap}
+.metric-bar{flex:1;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden}
+.metric-fill{height:100%;border-radius:3px;background:var(--interactive);transition:width .3s}
+.metric-fill.complete{background:var(--green)}
 .motivational{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:16px;font-size:13px;color:rgba(255,255,255,0.85);font-weight:500;line-height:1.5}
 
 /* ── SECTION DIVIDER ── */
@@ -643,6 +650,7 @@ var activeNoteId=null;
 var activePauseId=null;
 var activeEditIdx=-1;
 var editNNState=false;
+var editMetricEnabled=false;
 var editDays=[];
 var editIcon='💪';
 var editColor='#4f7fff';
@@ -650,6 +658,9 @@ var nhDays=[0,1,2,3,4,5,6];
 var nhIcon='💪';
 var nhColor='#4f7fff';
 var nhNonNeg=false;
+var nhMetricEnabled=false;
+var nhMetricLabel='';
+var nhMetricTarget=0;
 var syncTimeout=null;
 var photoUploadTarget=null;
 var sbExpanded=false;
@@ -1087,23 +1098,69 @@ function renderToday(){
   document.getElementById('tab-today').innerHTML=out;
 }
 
+function updateMetricBar(id,val,target){
+  var el=document.getElementById(id);if(!el)return;
+  var pct=target>0?Math.min(100,Math.round((parseFloat(val)||0)/target*100)):0;
+  el.style.width=pct+'%';
+  el.className='metric-fill'+(pct>=100?' complete':'');
+}
+function getMetricToday(hid){
+  var u=U();if(!u.metrics)u.metrics={};
+  var key=todayKey();if(!u.metrics[key])return 0;
+  return u.metrics[key][hid]||0;
+}
+function liveMetricBar(inp){
+  var hid=inp.dataset.mid;
+  var tgt=parseFloat(inp.dataset.mtgt)||0;
+  var el=document.getElementById('mb-'+hid);
+  if(el){var pct=tgt>0?Math.min(100,Math.round((parseFloat(inp.value)||0)/tgt*100)):0;el.style.width=pct+'%';el.className='metric-fill'+(pct>=100?' complete':'');}
+}
+function setMetricToday(hid,val){
+  var u=U();if(!u.metrics)u.metrics={};
+  var key=todayKey();if(!u.metrics[key])u.metrics[key]={};
+  var num=parseFloat(val)||0;
+  u.metrics[key][hid]=num;
+  var h=u.habits.filter(function(x){return x.id===hid;})[0];
+  if(h&&h.metric&&h.metric.enabled&&h.metric.target>0&&num>=h.metric.target){
+    if(!u.completions[key])u.completions[key]=[];
+    if(u.completions[key].indexOf(hid)<0)u.completions[key].push(hid);
+  }
+  saveS();renderToday();schedulePush();
+}
 function habitRowHTML(h){
   var done=isDoneToday(h.id);
   var s=getStreak(h.id);
   var last7=getLast7(h.id);
   var hasNote=!!(U().notes[todayKey()]&&U().notes[todayKey()][h.id]);
-  var checkContent=done?'✓':h.paused?'⏸':'';
+  var checkContent=done?'&#10003;':h.paused?'&#9208;':'';
   var checkCls=done?'done':h.paused?'paused':'';
-  var out='<div class="habit-card"><div class="habit-row">';
-  out+='<div class="h-icon" style="background:'+h.color+'22">'+h.icon+'</div>';
-  out+='<div class="h-info"><div class="h-name" onclick="openHabitDetail(\''+h.id+'\')" style="cursor:pointer">'+h.name+' <span style="font-size:10px;color:var(--text3)">&#9432;</span></div><div class="h-meta"><span class="h-freq">'+freqLabel(h)+'</span><span class="h-freq">'+timeIcon(h.time)+' '+h.time+'</span>';
-  if(h.nonNeg)out+='<span class="badge-nn">★ Non-neg</span>';
-  if(h.paused)out+='<span class="badge-paused">⏸ Paused'+(h.pauseUntil?' until '+h.pauseUntil:'')+'</span>';
+  var m=h.metric&&h.metric.enabled?h.metric:null;
+  var metricVal=m?getMetricToday(h.id):0;
+  var metricPct=m&&m.target>0?Math.min(100,Math.round(metricVal/m.target*100)):0;
+  var hesc=h.id.replace(/'/g,'');
+  var out='<div class="habit-card" data-card-hid="'+hesc+'"><div class="habit-row">';
+  out+='<div class="h-icon" style="background:'+h.color+'22;flex-shrink:0;margin-top:1px">'+h.icon+'</div>';
+  out+='<div class="h-info" style="min-width:0;flex:1">';
+    out+='<div class="h-name" onclick="hdClick(event)" title="'+h.name+'">'+h.name+'</div>';
+  out+='<div class="h-meta">';
+  out+='<span class="h-freq">'+freqLabel(h)+'</span>';
+  out+='<span class="h-freq">'+timeIcon(h.time)+'</span>';
+  if(h.nonNeg)out+='<span class="badge-nn">★</span>';
+  if(h.paused)out+='<span class="badge-paused">&#9208;'+(h.pauseUntil?' '+h.pauseUntil:'')+'</span>';
   out+='</div></div>';
-  out+='<div class="h-right"><div class="streaks" title="🔥 Current streak · 🏆 Longest streak · % 30-day rate"><span class="st fire" title="Current streak: '+s.cur+' days">🔥'+s.cur+'</span><span class="st" title="Longest streak: '+s.longest+' days">🏆'+s.longest+'</span><span class="st" title="30-day completion rate">'+s.rate+'%</span></div>';
-  out+='<button class="note-btn'+(hasNote?' has-note':'')+'" onclick="openNote(\''+h.id+'\')">📝</button>';
+  out+='<div class="h-right">';
+  out+='<div class="streaks"><span class="st fire">&#128293;'+s.cur+'</span><span class="st">&#127942;'+s.longest+'</span><span class="st">'+s.rate+'%</span></div>';
+  out+='<button class="note-btn'+(hasNote?' has-note':'')+'" onclick="nbClick(event)">&#128221;</button>';
   out+='<div class="check-btn '+checkCls+'" '+(h.paused?'':'data-hid="'+h.id+'" onclick="handleCheck(this)"')+'>'+checkContent+'</div>';
   out+='</div></div>';
+  if(m){
+    out+='<div class="metric-row">';
+    out+='<input class="metric-input" type="number" min="0" value="'+(metricVal||'')+'" placeholder="0" data-mid="'+h.id+'" data-mtgt="'+m.target+'" onchange="setMetricToday(this.dataset.mid,this.value)" oninput="liveMetricBar(this)" />';
+    out+='<span class="metric-target">/ '+m.target+' '+m.label+'</span>';
+    out+='<div class="metric-bar"><div class="metric-fill'+(metricPct>=100?' complete':'')+'" id="mb-'+h.id+'" style="width:'+metricPct+'%"></div></div>';
+    out+='<span style="font-size:11px;color:var(--text3);width:28px;text-align:right">'+metricPct+'%</span>';
+    out+='</div>';
+  }
   out+='<div class="streak-bar">';
   last7.forEach(function(d){out+='<div class="sday'+(d.done?' done':d.isToday?' today-d':'')+'"></div>';});
   out+='</div></div>';
@@ -1159,9 +1216,24 @@ function resumeHabit(idx){
 function openEdit(idx){
   var h=U().habits[idx];activeEditIdx=idx;
   editNNState=h.nonNeg;editDays=h.days.slice();editIcon=h.icon;editColor=h.color;
+  editMetricEnabled=h.metric&&h.metric.enabled?true:false;
   document.getElementById('edit-name').value=h.name;
   document.getElementById('edit-time').value=h.time||'morning';
   renderEditPickers();
+  setTimeout(function(){
+    var mt=document.getElementById('edit-metric-track');
+    var ml=document.getElementById('edit-metric-lbl');
+    var mf=document.getElementById('edit-metric-fields');
+    if(mt){mt.className='tog-track'+(editMetricEnabled?' on':'');mt.innerHTML='<div class="tog-knob"></div>';}
+    if(ml)ml.textContent=editMetricEnabled?'Yes':'No';
+    if(mf)mf.style.display=editMetricEnabled?'block':'none';
+    if(editMetricEnabled&&h.metric){
+      var tgt=document.getElementById('edit-mtarget');
+      var lbl=document.getElementById('edit-mlabel');
+      if(tgt)tgt.value=h.metric.target||'';
+      if(lbl)lbl.value=h.metric.label||'';
+    }
+  },50);
   document.getElementById('edit-modal').style.display='flex';
 }
 function renderEditPickers(){
@@ -1177,12 +1249,24 @@ function setEditIcon(ic){editIcon=ic;renderEditPickers();}
 function setEditColor(c){editColor=c;renderEditPickers();}
 function toggleEditDay(dow){var i=editDays.indexOf(dow);if(i>=0)editDays.splice(i,1);else editDays.push(dow);renderEditPickers();}
 function toggleEditNN(){editNNState=!editNNState;renderEditPickers();}
+function toggleEditMetric(){
+  editMetricEnabled=!editMetricEnabled;
+  var mt=document.getElementById('edit-metric-track');
+  var ml=document.getElementById('edit-metric-lbl');
+  var mf=document.getElementById('edit-metric-fields');
+  if(mt){mt.className='tog-track'+(editMetricEnabled?' on':'');mt.innerHTML='<div class="tog-knob"></div>';}
+  if(ml)ml.textContent=editMetricEnabled?'Yes':'No';
+  if(mf)mf.style.display=editMetricEnabled?'block':'none';
+}
 function saveEdit(){
   if(activeEditIdx<0)return;
   var h=U().habits[activeEditIdx];
   h.name=document.getElementById('edit-name').value.trim()||h.name;
   h.icon=editIcon;h.color=editColor;h.time=document.getElementById('edit-time').value;
   h.days=editDays.slice();h.freq=h.days.length===7?'daily':'custom';h.nonNeg=editNNState;
+  var tgt=document.getElementById('edit-mtarget');
+  var lbl=document.getElementById('edit-mlabel');
+  h.metric={enabled:editMetricEnabled,target:tgt?parseFloat(tgt.value)||0:0,label:lbl?lbl.value.trim():''};
   document.getElementById('edit-modal').style.display='none';
   saveS();renderHabits();renderToday();toast('Habit updated ✓','ok');schedulePush();
 }
@@ -1546,6 +1630,11 @@ function renderHabits(){
   out+='<div class="f-row"><div class="f-lbl">Days</div><div style="margin-bottom:6px"><button class="mbtn" onclick="setNHAll()" style="margin-right:6px">Every day</button><button class="mbtn" onclick="setNHWeekdays()" style="margin-right:6px">Weekdays</button><button class="mbtn" onclick="setNHWeekends()">Weekends</button></div>';
   out+='<div class="days-picker">'+['M','T','W','T','F','S','S'].map(function(l,i){var dow=(i+1)%7;return '<div class="day-tog'+(nhDays.indexOf(dow)>=0?' on':'')+'" onclick="toggleNHDay('+dow+')">'+l+'</div>';}).join('')+'</div></div>';
   out+='<div class="f-row"><div class="f-lbl">Non-negotiable</div><div style="display:flex;align-items:center;gap:10px"><div class="tog-track'+(nhNonNeg?' on':'')+'" onclick="toggleNHNN()"><div class="tog-knob"></div></div><span style="font-size:13px;color:var(--text2)">'+(nhNonNeg?'Yes — must do daily':'No')+'</span></div></div>';
+  out+='<div class="f-row"><div class="f-lbl">Track a metric? (optional)</div>';
+  out+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div class="tog-track'+(nhMetricEnabled?' on':'')+'" onclick="toggleNHMetric()"><div class="tog-knob"></div></div>';
+  out+='<span style="font-size:13px;color:var(--text2)">'+(nhMetricEnabled?'Yes':'No')+'</span></div>';
+  if(nhMetricEnabled){out+='<div style="display:flex;gap:8px"><input type="number" id="nh-mtarget" placeholder="Target e.g. 10" style="flex:1" value="'+(nhMetricTarget||'')+'" /><input type="text" id="nh-mlabel" placeholder="Unit e.g. pages, mins, litres" style="flex:2" value="'+(nhMetricLabel||'')+'" /></div>';}
+  out+='</div>';
   out+='<button class="btn btn-primary btn-full" onclick="addHabit()">Add Habit</button></div>';
   document.getElementById('tab-habits').innerHTML=out;
 }
@@ -1556,6 +1645,15 @@ function toggleNHDay(dow){var v=document.getElementById('nh-name');var s=v?v.val
 function setNHAll(){var v=document.getElementById('nh-name');var s=v?v.value:'';nhDays=[0,1,2,3,4,5,6];renderHabits();var n=document.getElementById('nh-name');if(n&&s)n.value=s;}
 function setNHWeekdays(){var v=document.getElementById('nh-name');var s=v?v.value:'';nhDays=[1,2,3,4,5];renderHabits();var n=document.getElementById('nh-name');if(n&&s)n.value=s;}
 function setNHWeekends(){var v=document.getElementById('nh-name');var s=v?v.value:'';nhDays=[0,6];renderHabits();var n=document.getElementById('nh-name');if(n&&s)n.value=s;}
+function toggleNHMetric(){
+  var v=document.getElementById('nh-name');var sv=v?v.value:'';
+  var mt=document.getElementById('nh-mtarget');var ml=document.getElementById('nh-mlabel');
+  if(mt)nhMetricTarget=parseFloat(mt.value)||0;
+  if(ml)nhMetricLabel=ml.value.trim();
+  nhMetricEnabled=!nhMetricEnabled;
+  renderHabits();
+  var n=document.getElementById('nh-name');if(n&&sv)n.value=sv;
+}
 function toggleNHNN(){var v=document.getElementById('nh-name');var s=v?v.value:'';nhNonNeg=!nhNonNeg;renderHabits();var n=document.getElementById('nh-name');if(n&&s)n.value=s;}
 
 function addHabit(){
@@ -1563,8 +1661,13 @@ function addHabit(){
   var time=document.getElementById('nh-time').value;
   if(!name){toast('Enter a habit name','warn');return;}
   if(!nhDays.length){toast('Select at least one day','warn');return;}
+  var mt=document.getElementById('nh-mtarget');var ml=document.getElementById('nh-mlabel');
+  if(mt)nhMetricTarget=parseFloat(mt.value)||0;
+  if(ml)nhMetricLabel=ml.value.trim();
+  var metric={enabled:nhMetricEnabled,label:nhMetricLabel,target:nhMetricTarget};
   var u=U();
-  u.habits.push({id:S.currentUser[0]+Date.now(),name:name,icon:nhIcon,color:nhColor,freq:nhDays.length===7?'daily':'custom',days:nhDays.slice(),time:time,nonNeg:nhNonNeg,paused:false,pauseUntil:''});
+  u.habits.push({id:S.currentUser[0]+Date.now(),name:name,icon:nhIcon,color:nhColor,freq:nhDays.length===7?'daily':'custom',days:nhDays.slice(),time:time,nonNeg:nhNonNeg,paused:false,pauseUntil:'',metric:metric});
+  nhMetricEnabled=false;nhMetricLabel='';nhMetricTarget=0;
   saveS();renderHabits();renderToday();toast(nhIcon+' '+name+' added!','ok');schedulePush();
 }
 
@@ -1648,90 +1751,79 @@ function schedulePush(){
 async function pushToSupabase(){
   if(!S.supabaseUrl||!S.supabaseKey)return;
   setSyncStatus('syncing');
-  // Include photo URL in saved data so other devices can restore it
-  var userData=JSON.parse(JSON.stringify(S.users[S.currentUser]));
-  userData.photoUrl=S.photos[S.currentUser]||'';
-  userData._savedAt=new Date().toISOString();
-  var payload={user_id:S.currentUser,data:JSON.stringify(userData),updated_at:new Date().toISOString()};
-  try{
-    var r=await fetch(S.supabaseUrl+'/rest/v1/habit_data',{
+  var now=new Date().toISOString();
+  var promises=['sai','vineetha'].map(function(uid){
+    var userData=JSON.parse(JSON.stringify(S.users[uid]));
+    userData.photoUrl=S.photos[uid]||'';
+    userData._savedAt=now;
+    var payload={user_id:uid,data:JSON.stringify(userData),updated_at:now};
+    return fetch(S.supabaseUrl+'/rest/v1/habit_data',{
       method:'POST',
       headers:{'apikey':S.supabaseKey,'Authorization':'Bearer '+S.supabaseKey,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
       body:JSON.stringify(payload)
     });
-    if(r.ok||r.status===201||r.status===204)setSyncStatus('ok');
-    else setSyncStatus('err');
-  }catch(e){setSyncStatus('err');}
+  });
+  try{await Promise.all(promises);setSyncStatus('ok');}catch(e){setSyncStatus('err');}
 }
 
 async function syncFromSupabase(){
   if(!S.supabaseUrl||!S.supabaseKey)return;
   setSyncStatus('syncing');
   try{
-    // Fetch both users' data in one call
     var r=await fetch(S.supabaseUrl+'/rest/v1/habit_data?select=user_id,data',{
       headers:{'apikey':S.supabaseKey,'Authorization':'Bearer '+S.supabaseKey}
     });
     var rows=await r.json();
-    if(rows&&rows.length){
-      rows.forEach(function(row){
-        var uid=row.user_id;
-        if(!S.users[uid])return;
-        try{
-          var remote=JSON.parse(row.data);
-          var local=S.users[uid];
-          // Last-write-wins: compare timestamps
-          var remoteTime=remote._savedAt?new Date(remote._savedAt):new Date(0);
-          var localTime=local._savedAt?new Date(local._savedAt):new Date(0);
-          var remoteWins=remoteTime>localTime;
-
-          if(remoteWins){
-            // Remote is newer — take habits and notes from remote
-            local.habits=remote.habits||local.habits;
-            // Merge completions (always union — never lose ticks)
-            Object.keys(remote.completions||{}).forEach(function(k){
-              if(!local.completions[k])local.completions[k]=remote.completions[k];
-              else{
-                remote.completions[k].forEach(function(id){
-                  if(local.completions[k].indexOf(id)<0)local.completions[k].push(id);
-                });
-              }
-            });
-            // Merge notes
-            Object.keys(remote.notes||{}).forEach(function(k){
-              if(!local.notes[k])local.notes[k]=remote.notes[k];
-            });
-          } else {
-            // Local is newer — only merge completions from remote (never override local habits)
-            Object.keys(remote.completions||{}).forEach(function(k){
-              if(!local.completions[k])local.completions[k]=remote.completions[k];
-              else{
-                remote.completions[k].forEach(function(id){
-                  if(local.completions[k].indexOf(id)<0)local.completions[k].push(id);
-                });
-              }
-            });
-          }
-          // Restore photo URL — key fix for cross-device photos
-          if(remote.photoUrl&&remote.photoUrl.startsWith('http')){
-            S.photos[uid]=remote.photoUrl;
-            try{localStorage.setItem('dh_photourl_'+uid,remote.photoUrl);}catch(ex){}
-          }
-        }catch(ex){}
-      });
-      saveS();
-      updateAvatars();
-      if(S.currentUser)updateHeaderAvatar();
-      renderAll();
-    }
-    setSyncStatus('ok');
-  }catch(e){setSyncStatus('err');}
+    if(!Array.isArray(rows)){setSyncStatus('err');return;}
+    rows.forEach(function(row){
+      var uid=row.user_id;
+      if(!S.users[uid])S.users[uid]={habits:[],completions:{},notes:{}};
+      try{
+        var remote=JSON.parse(row.data);
+        var local=S.users[uid];
+        var remoteT=remote._savedAt?new Date(remote._savedAt).getTime():0;
+        var localT=local._savedAt?new Date(local._savedAt).getTime():0;
+        // Remote wins for habits if remote is newer OR local was never saved (new device)
+        if(remoteT>localT||(localT===0&&remoteT>0)){
+          if(remote.habits&&remote.habits.length)local.habits=remote.habits;
+          Object.keys(remote.notes||{}).forEach(function(k){
+            if(!local.notes[k])local.notes[k]=remote.notes[k];
+          });
+        }
+        // Always union completions
+        Object.keys(remote.completions||{}).forEach(function(k){
+          if(!local.completions[k])local.completions[k]=[];
+          (remote.completions[k]||[]).forEach(function(id){
+            if(local.completions[k].indexOf(id)<0)local.completions[k].push(id);
+          });
+        });
+        // Merge metrics
+        if(remote.metrics){
+          if(!local.metrics)local.metrics={};
+          Object.keys(remote.metrics).forEach(function(k){
+            if(!local.metrics[k])local.metrics[k]=remote.metrics[k];
+            else Object.assign(local.metrics[k],remote.metrics[k]);
+          });
+        }
+        // Restore photo
+        if(remote.photoUrl&&remote.photoUrl.startsWith('http')){
+          S.photos[uid]=remote.photoUrl;
+          try{localStorage.setItem('dh_photourl_'+uid,remote.photoUrl);}catch(ex){}
+        }
+      }catch(ex){console.error('Sync err',uid,ex);}
+    });
+    saveS();updateAvatars();
+    if(S.currentUser)updateHeaderAvatar();
+    renderAll();setSyncStatus('ok');
+  }catch(e){console.error('Sync failed',e);setSyncStatus('err');}
 }
 
 // ── HABIT DETAIL ──
 var detailHabitId = null;
 var detailMonth = null;
 
+function hdClick(e){var card=e.target.closest('[data-card-hid]');if(card)openHabitDetail(card.dataset.cardHid);}
+function nbClick(e){var card=e.target.closest('[data-card-hid]');if(card)openNote(card.dataset.cardHid);}
 function openHabitDetail(hid){
   detailHabitId = hid;
   var now = new Date();
