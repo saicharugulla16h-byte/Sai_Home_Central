@@ -259,9 +259,12 @@ select:focus { border-color: var(--accent); }
   <div id="tab-settings" style="display:none;"></div>
 </div>
 
-<div class="bottom-bar" id="bottom-bar" style="display:none;">
-  <button class="btn btn-outline" style="flex:1;" onclick="runTally()">📊 Tally</button>
-  <button class="btn btn-primary" style="flex:1;" id="save-btn" onclick="trySave()" disabled>Save to Sheets</button>
+<div class="bottom-bar" id="bottom-bar" style="display:none;flex-direction:column;gap:6px;padding-bottom:36px;">
+  <div style="display:flex;gap:10px;width:100%;">
+    <button class="btn btn-outline" style="flex:1;" onclick="runTally()">📊 Tally</button>
+    <button class="btn btn-primary" style="flex:1;" id="save-btn" onclick="trySave()" disabled>Save to Sheets</button>
+  </div>
+  <div id="sync-timestamps" style="font-size:11px;color:var(--text3);text-align:center;display:flex;gap:12px;justify-content:center;"></div>
 </div>
 
 <!-- Month picker -->
@@ -309,7 +312,7 @@ select:focus { border-color: var(--accent); }
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
-let S = { currentKey:'', budgets:{}, fixedExpenses:[], webhookUrl:'' };
+let S = { currentKey:'', budgets:{}, fixedExpenses:[], varExpenseTemplates:[], webhookUrl:'', lastSaved:null, lastSynced:null };
 let activeCCIdx = -1;
 let activeTab = 'plan';
 
@@ -327,7 +330,7 @@ function defaultFixed() {
 }
 
 function emptyBudget(key) {
-  return { key, frozen:false, hdfc:0, bom:0, variableExpenses:[], tallyApproved:false, createdAt:new Date().toISOString() };
+  return { key, frozen:false, hdfc:0, bom:0, sbi:0, icici:0, variableExpenses:[], tallyApproved:false, createdAt:new Date().toISOString() };
 }
 
 function monthKey(y,m) { return `${y}-${String(m+1).padStart(2,'0')}`; }
@@ -341,6 +344,7 @@ function saveS() { try { localStorage.setItem('bpv3', JSON.stringify(S)); } catc
 function loadS() {
   try { const d=localStorage.getItem('bpv3'); if(d) S=JSON.parse(d); } catch(e){}
   if (!S.fixedExpenses||!S.fixedExpenses.length) S.fixedExpenses=defaultFixed();
+  if (!S.varExpenseTemplates) S.varExpenseTemplates=[];
   if (!S.budgets) S.budgets={};
   if (!S.webhookUrl) S.webhookUrl='';
 }
@@ -359,7 +363,7 @@ function B() { return S.budgets[S.currentKey]; }
 
 // ─── MATHS ───────────────────────────────────────────────────────────────────
 function fmt(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
-function totalIncome(b) { return (b.hdfc||0)+(b.bom||0); }
+function totalIncome(b) { return (b.hdfc||0)+(b.bom||0)+(b.sbi||0)+(b.icici||0); }
 function totalFixed()   { return S.fixedExpenses.reduce((s,e)=>s+e.amount,0); }
 function totalVar(b)    { return (b.variableExpenses||[]).reduce((s,e)=>s+(e.amount||0),0); }
 function availForVar(b) { return totalIncome(b)-totalFixed(); }
@@ -389,6 +393,13 @@ function formulaPreview(raw) {
 // ─── RENDER ALL ───────────────────────────────────────────────────────────────
 function renderAll() {
   document.getElementById('hdr-month').textContent = monthLabel(S.currentKey);
+  // Update sync timestamps display
+  const tsEl = document.getElementById('sync-timestamps');
+  if(tsEl) {
+    const saved = S.lastSaved ? '📤 ' + new Date(S.lastSaved).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '📤 Never saved';
+    const synced = S.lastSynced ? '📥 ' + new Date(S.lastSynced).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '📥 Never synced';
+    tsEl.innerHTML = `<span>${saved}</span><span>${synced}</span>`;
+  }
   renderPlan();
   if (activeTab==='history') renderHistory();
   if (activeTab==='settings') renderSettings();
@@ -426,6 +437,20 @@ function renderPlan() {
       ${frozen
         ? `<span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(b.bom||0)}</span>`
         : `<input type="text" id="inc-bom" class="inc-input" value="${b.bom||''}" placeholder="0 or =expr" onchange="setIncome('bom',this.value)" />`
+      }
+    </div>
+    <div class="inc-row">
+      <span class="inc-label">SBI</span>
+      ${frozen
+        ? `<span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(b.sbi||0)}</span>`
+        : `<input type="text" id="inc-sbi" class="inc-input" value="${b.sbi||''}" placeholder="0 or =expr" onchange="setIncome('sbi',this.value)" />`
+      }
+    </div>
+    <div class="inc-row">
+      <span class="inc-label">ICICI</span>
+      ${frozen
+        ? `<span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(b.icici||0)}</span>`
+        : `<input type="text" id="inc-icici" class="inc-input" value="${b.icici||''}" placeholder="0 or =expr" onchange="setIncome('icici',this.value)" />`
       }
     </div>
     <div class="inc-total-row">
@@ -523,8 +548,8 @@ function setIncome(field, val) {
   b.tallyApproved=false;
   document.getElementById('save-btn').disabled=true;
   // Replace input with resolved value
-  const id = field==='hdfc' ? 'inc-hdfc' : 'inc-bom';
-  const el = document.getElementById(id);
+  const idMap = {hdfc:'inc-hdfc',bom:'inc-bom',sbi:'inc-sbi',icici:'inc-icici'};
+  const el = document.getElementById(idMap[field]||'');
   if (el) el.value = resolved || '';
   saveS(); renderPlan();
 }
@@ -717,6 +742,8 @@ async function trySave() {
     ['INCOME','','',''],
     ['HDFC','',b.hdfc||0,''],
     ['Bank of Maharashtra','',b.bom||0,''],
+    ['SBI','',b.sbi||0,''],
+    ['ICICI','',b.icici||0,''],
     ['Total Income','',income,''],
     ['','','',''],
     ['NON-NEGOTIABLES','Amount','Due',''],
@@ -744,8 +771,18 @@ async function trySave() {
 // ─── HISTORY ─────────────────────────────────────────────────────────────────
 function renderHistory() {
   const keys=Object.keys(S.budgets).sort().reverse();
-  const syncBar=`<div style="display:flex;gap:10px;margin-bottom:14px;">
-    <button class="btn btn-outline" style="flex:1;" onclick="syncFromSheets()">☁️ Sync from Sheets</button>
+  const lastSyncStr = S.lastSynced
+    ? `Last synced: ${new Date(S.lastSynced).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`
+    : 'Never synced from Sheets';
+  const lastSaveStr = S.lastSaved
+    ? `Last saved to Sheets: ${new Date(S.lastSaved).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`
+    : 'Never saved to Sheets';
+  const syncBar=`<div style="margin-bottom:14px;">
+    <button class="btn btn-outline btn-full" onclick="syncFromSheets()" style="margin-bottom:8px;">☁️ Sync from Sheets</button>
+    <div style="font-size:12px;color:var(--text3);display:flex;flex-direction:column;gap:3px;padding:0 2px;">
+      <span>📥 ${lastSyncStr}</span>
+      <span>📤 ${lastSaveStr}</span>
+    </div>
   </div>`;
   if (!keys.length) {
     document.getElementById('tab-history').innerHTML=syncBar+'<div class="empty">No local history yet.<br>Sync from Sheets to load all devices\' data.</div>';
@@ -858,6 +895,8 @@ function fetchViaScript(url) {
     }
     saveS();
     renderAll();
+    S.lastSynced = new Date().toISOString();
+    saveS();
     toast(merged > 0 ? `✓ Synced — ${merged} month(s) loaded from Sheets` : '✓ Already up to date','ok');
     const btn = document.querySelector('[onclick="syncFromSheets()"]');
     if (btn) { btn.textContent='☁️ Sync from Sheets'; btn.disabled=false; }
@@ -940,6 +979,19 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }`;
 
+  // Variable expense templates rows
+  let varTemplateRows='';
+  S.varExpenseTemplates.forEach((e,i)=>{
+    varTemplateRows+=`<div class="exp-row">
+      <div><div class="exp-name">${e.name}</div>${e.date?`<div class="exp-date">Due ${e.date}</div>`:''}</div>
+      <div class="exp-badge-amt">
+        <span class="badge badge-var">Variable</span>
+        ${e.isCC?'<span class="badge badge-cc" style="font-size:11px;background:var(--red-bg);color:var(--red-text)">CC</span>':''}
+        <button class="btn btn-ghost-red" onclick="removeVarTemplate(${i})">✕</button>
+      </div>
+    </div>`;
+  });
+
   document.getElementById('tab-settings').innerHTML=`
     <div class="card">
       <div class="card-header"><span class="card-title">Google Sheets Connection</span></div>
@@ -979,12 +1031,49 @@ function doGet(e) {
         </select>
         <button class="btn btn-primary" onclick="addFixed()">Add</button>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Variable Expense Templates</span>
+        <span style="font-size:12px;color:var(--text3)">Names carry to new months</span>
+      </div>
+      <div style="font-size:12px;color:var(--text3);padding:10px 16px;border-bottom:1px solid var(--border)">
+        Add your recurring variable expenses here. Each new month copies the names with blank amounts for you to fill in.
+      </div>
+      ${varTemplateRows||'<div style="font-size:13px;color:var(--text3);padding:14px 16px;">No templates yet. Add below.</div>'}
+      <div class="add-form">
+        <input type="text" id="vt-name" placeholder="Expense name" style="flex:1;" />
+        <select id="vt-date" style="width:72px;">
+          <option value="">Day</option>
+          ${Array.from({length:31},(_,i)=>'<option value="'+i+1+'th">'+i+1+'</option>').join('')}
+        </select>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text2);cursor:pointer;white-space:nowrap;">
+          <input type="checkbox" id="vt-cc" style="width:16px;height:16px;accent-color:var(--accent);" /> CC
+        </label>
+        <button class="btn btn-primary" onclick="addVarTemplate()">Add</button>
+      </div>
     </div>`;
 }
 
 function saveWebhook() {
   S.webhookUrl=document.getElementById('webhook-input').value.trim();
   saveS(); toast('Apps Script URL saved','ok');
+}
+function addVarTemplate() {
+  const name=document.getElementById('vt-name').value.trim();
+  const date=document.getElementById('vt-date').value;
+  const isCC=document.getElementById('vt-cc').checked;
+  if(!name){toast('Enter an expense name','warn');return;}
+  if(!S.varExpenseTemplates)S.varExpenseTemplates=[];
+  S.varExpenseTemplates.push({name,date,isCC});
+  document.getElementById('vt-name').value='';
+  saveS();renderSettings();
+  toast(name+' added to templates','ok');
+}
+function removeVarTemplate(i) {
+  S.varExpenseTemplates.splice(i,1);
+  saveS();renderSettings();
 }
 
 async function testConnection() {
@@ -1057,8 +1146,10 @@ function loadMonth(key) {
 function createNewMonth() {
   const keys=Object.keys(S.budgets).sort();
   let next;
+  let prevKey=null;
   if(keys.length){
     const last=keys[keys.length-1];
+    prevKey=last;
     const [y,m]=last.split('-').map(Number);
     const d=new Date(y,m,1);
     next=monthKey(d.getFullYear(),d.getMonth());
@@ -1066,7 +1157,26 @@ function createNewMonth() {
     const now=new Date();
     next=monthKey(now.getFullYear(),now.getMonth());
   }
-  if(!S.budgets[next]) S.budgets[next]=emptyBudget(next);
+  if(!S.budgets[next]){
+    const budget=emptyBudget(next);
+    // Carry forward variable expense names from previous month (amounts blank)
+    if(prevKey && S.budgets[prevKey]){
+      const prevVars=S.budgets[prevKey].variableExpenses||[];
+      budget.variableExpenses=prevVars.map(e=>({
+        name:e.name,
+        amount:0,
+        rawInput:'',
+        date:e.date||'',
+        isCC:e.isCC||false
+      }));
+    } else if(S.varExpenseTemplates && S.varExpenseTemplates.length){
+      // Use templates from settings if no previous month
+      budget.variableExpenses=S.varExpenseTemplates.map(e=>({
+        name:e.name,amount:0,rawInput:'',date:e.date||'',isCC:e.isCC||false
+      }));
+    }
+    S.budgets[next]=budget;
+  }
   S.currentKey=next; saveS();
   document.getElementById('mpicker-modal').style.display='none';
   renderAll();
