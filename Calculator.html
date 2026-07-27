@@ -23,8 +23,6 @@
   .calculator {
     width: 100%;
     height: 100%;
-    max-width: 480px;
-    max-height: 480px;
     background: #1c1c1e;
     border-radius: 16px;
     padding: 2.5%;
@@ -47,21 +45,13 @@
     white-space: nowrap;
   }
 
-  .buttons {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: repeat(5, 1fr);
-    gap: 2.5%;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
   button {
     border: none;
     border-radius: 10px;
     width: 100%;
     height: 100%;
     min-height: 0;
+    min-width: 0;
     font-size: clamp(14px, 3.5vh, 22px);
     cursor: pointer;
     color: #ffffff;
@@ -82,10 +72,42 @@
     color: #000000;
   }
 
-  .zero {
+  /* Portrait / narrow-tall box: classic 4-column, 5-row phone layout */
+  .buttons-portrait {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+    gap: 2.5%;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .buttons-landscape {
+    display: none;
+  }
+
+  .wide-zero {
     grid-column: span 2;
-    text-align: left;
-    padding-left: 6%;
+  }
+
+  /* Landscape / wide-short box: 5-column, 4-row layout */
+  @media (min-aspect-ratio: 1/1) {
+    .buttons-portrait {
+      display: none;
+    }
+
+    .buttons-landscape {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 2.5%;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    .wide-equals {
+      grid-column: span 2;
+    }
   }
 </style>
 </head>
@@ -93,7 +115,9 @@
 
 <div class="calculator">
   <div class="display" id="display">0</div>
-  <div class="buttons">
+
+  <!-- Portrait layout: shown when box is taller than it is wide -->
+  <div class="buttons-portrait">
     <button class="fn" onclick="clearAll()">AC</button>
     <button class="fn" onclick="toggleSign()">+/-</button>
     <button class="fn" onclick="percent()">%</button>
@@ -114,9 +138,35 @@
     <button onclick="appendDigit('3')">3</button>
     <button class="op" onclick="chooseOperator('+')">+</button>
 
-    <button class="zero" onclick="appendDigit('0')">0</button>
+    <button class="wide-zero" onclick="appendDigit('0')">0</button>
     <button onclick="appendDigit('.')">.</button>
     <button class="op" onclick="calculate()">=</button>
+  </div>
+
+  <!-- Landscape layout: shown when box is wider than it is tall -->
+  <div class="buttons-landscape">
+    <button class="fn" onclick="clearAll()">AC</button>
+    <button class="fn" onclick="toggleSign()">+/-</button>
+    <button class="fn" onclick="percent()">%</button>
+    <button class="op" onclick="chooseOperator('÷')">÷</button>
+    <button class="op" onclick="chooseOperator('×')">×</button>
+
+    <button onclick="appendDigit('1')">1</button>
+    <button onclick="appendDigit('2')">2</button>
+    <button onclick="appendDigit('3')">3</button>
+    <button onclick="appendDigit('4')">4</button>
+    <button onclick="appendDigit('5')">5</button>
+
+    <button onclick="appendDigit('6')">6</button>
+    <button onclick="appendDigit('7')">7</button>
+    <button onclick="appendDigit('8')">8</button>
+    <button onclick="appendDigit('9')">9</button>
+    <button onclick="appendDigit('0')">0</button>
+
+    <button onclick="appendDigit('.')">.</button>
+    <button class="op" onclick="chooseOperator('-')">-</button>
+    <button class="op" onclick="chooseOperator('+')">+</button>
+    <button class="op wide-equals" onclick="calculate()">=</button>
   </div>
 </div>
 
