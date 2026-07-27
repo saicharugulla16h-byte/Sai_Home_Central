@@ -23,10 +23,11 @@
   .calculator {
     width: 100%;
     height: 100%;
-    max-width: 340px;
+    max-width: 480px;
+    max-height: 480px;
     background: #1c1c1e;
     border-radius: 16px;
-    padding: 3%;
+    padding: 2.5%;
     box-shadow: 0 8px 24px rgba(0,0,0,0.15);
     display: flex;
     flex-direction: column;
@@ -37,8 +38,8 @@
     background: transparent;
     color: #ffffff;
     text-align: right;
-    padding: 4% 3%;
-    font-size: clamp(20px, 8vw, 42px);
+    padding: 2% 3%;
+    font-size: clamp(18px, 6vh, 42px);
     font-weight: 300;
     flex: 0 0 auto;
     word-wrap: break-word;
@@ -50,21 +51,22 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(5, 1fr);
-    gap: 3%;
+    gap: 2.5%;
     flex: 1 1 auto;
+    min-height: 0;
   }
 
   button {
     border: none;
-    border-radius: 50%;
+    border-radius: 10px;
     width: 100%;
     height: 100%;
-    font-size: clamp(14px, 5vw, 22px);
+    min-height: 0;
+    font-size: clamp(14px, 3.5vh, 22px);
     cursor: pointer;
     color: #ffffff;
     background: #333336;
     transition: filter 0.1s ease;
-    aspect-ratio: 1;
   }
 
   button:active {
@@ -82,10 +84,8 @@
 
   .zero {
     grid-column: span 2;
-    border-radius: 999px;
     text-align: left;
-    padding-left: 8%;
-    aspect-ratio: unset;
+    padding-left: 6%;
   }
 </style>
 </head>
