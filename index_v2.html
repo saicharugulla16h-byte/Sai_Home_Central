@@ -1,1573 +1,404 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Budget — Sai">
-<title>Budget Planner for Sai</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Budget Planner</title>
 <style>
-:root {
-  --bg: #f2f4f1;
-  --surface: #ffffff;
-  --surface2: #f6f7f5;
-  --border: #e4e7e1;
-  --text: #1c2118;
-  --text2: #5a6355;
-  --text3: #9aa394;
-  --accent: #2d6a3f;
-  --accent-dark: #1e4d2c;
-  --accent-light: #eaf4ec;
-  --accent-mid: #4a9660;
-  --green: #2d6a3f;
-  --green-bg: #eaf4ec;
-  --green-text: #1e4d2c;
-  --red: #9b2226;
-  --red-bg: #fce8e8;
-  --red-text: #7a1a1d;
-  --amber: #7d4e00;
-  --amber-bg: #fff4e0;
-  --amber-text: #5c3800;
-  --blue: #1b4f72;
-  --blue-bg: #e8f3fb;
-  --blue-text: #0f3350;
-  --radius: 14px;
-  --radius-sm: 9px;
-  --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 2px 12px rgba(0,0,0,0.04);
-  --font: 'Plus Jakarta Sans', -apple-system, 'Helvetica Neue', sans-serif;
+:root{
+  --bg:#f7f8f6;--card:#fff;--line:#e7e9e5;--text:#20231f;--muted:#737a70;
+  --green:#27663b;--green2:#eaf4ed;--red:#a3292d;--red2:#fbecec;
+  --amber:#8a5a00;--amber2:#fff5df;--blue:#245b83;--blue2:#eaf3f9;
+  --shadow:0 1px 3px rgba(25,35,25,.05),0 8px 24px rgba(25,35,25,.04);
+  --r:14px;--font:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif
 }
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-html, body { min-height: 100%; background: var(--bg); font-family: var(--font); color: var(--text); font-size: 15px; }
-
-/* ── HEADER ── */
-.header {
-  background: linear-gradient(160deg, var(--accent) 0%, var(--accent-dark) 100%);
-  padding: 54px 18px 0;
-  position: sticky; top: 0; z-index: 100;
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:var(--font)}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.app{min-height:100vh;display:flex}
+.sidebar{width:230px;background:#fff;border-right:1px solid var(--line);padding:24px 14px;position:fixed;inset:0 auto 0 0;z-index:20}
+.brand{font-size:18px;font-weight:700;padding:6px 12px 28px}
+.brand small{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-top:3px}
+.nav{display:grid;gap:4px}
+.nav button{border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:9px;color:var(--muted);font-size:14px}
+.nav button.active{background:var(--green2);color:var(--green);font-weight:600}
+.sidebar-month{margin-top:28px;padding:12px;border:1px solid var(--line);border-radius:10px}
+.sidebar-month small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.sidebar-month strong{font-size:14px}
+.main{margin-left:230px;width:calc(100% - 230px);min-width:0}
+.topbar{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 30px;position:sticky;top:0;z-index:10}
+.topbar-title{font-size:15px;font-weight:600}
+.topbar-actions{display:flex;gap:8px}
+.page{max-width:1080px;margin:0 auto;padding:28px 30px 50px}
+.month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.month-nav h1{font-size:25px;margin:0;font-weight:650;letter-spacing:-.5px}
+.month-nav .arrows{display:flex;gap:6px}
+.icon-btn{width:36px;height:36px;border:1px solid var(--line);background:#fff;border-radius:9px;color:var(--text)}
+.status{font-size:11px;border-radius:20px;padding:5px 9px;font-weight:600}
+.draft{background:var(--amber2);color:var(--amber)}.final{background:var(--green2);color:var(--green)}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.metric{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.metric .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.metric .value{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.metric .value.negative{color:var(--red)}
+.metric .value.positive{color:var(--green)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow);margin-bottom:14px}
+.card-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.card-head h2{font-size:13px;margin:0;font-weight:650}
+.card-head span{font-size:13px;font-weight:650}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);min-height:56px}
+.row:last-child{border-bottom:0}
+.row-name{font-size:14px}.row-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.amount{font-size:14px;font-weight:650;font-variant-numeric:tabular-nums;text-align:right}
+.row-input{width:130px;text-align:right;border:1px solid var(--line);background:#fafbfa;border-radius:8px;padding:8px 9px;outline:0}
+.row-input:focus{border-color:var(--green);background:#fff}
+.menu-btn{border:0;background:transparent;color:var(--muted);font-size:19px;width:30px;height:32px;border-radius:7px}
+.menu-btn:hover{background:var(--bg)}
+.add-row{padding:12px 16px;background:#fafbfa;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
+.add-row input,.add-row select{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 9px;outline:0}
+.add-row input.name{flex:1;min-width:140px}.add-row input.money{width:135px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 13px;font-size:13px}
+.btn.primary{background:var(--green);border-color:var(--green);color:#fff}.btn.danger{color:var(--red);border-color:#f1d2d2}
+.btn.full{width:100%}
+.review{margin-top:4px;display:flex;gap:9px}
+.review .btn{flex:1}
+.notice{padding:12px 14px;border-radius:10px;margin-bottom:14px;font-size:13px}
+.notice.info{background:var(--blue2);color:var(--blue)}.notice.warn{background:var(--red2);color:var(--red)}
+.formula{font-size:10px;color:var(--green);text-align:right;margin-top:2px;display:none}
+.empty{padding:24px 16px;text-align:center;color:var(--muted);font-size:13px}
+.history-year{margin:18px 0 9px;font-size:12px;color:var(--muted);font-weight:650;text-transform:uppercase;letter-spacing:.08em}
+.history-row{background:#fff;border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:8px;display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr auto;gap:12px;align-items:center}
+.history-row strong{font-size:14px}.history-row small{display:block;color:var(--muted);font-size:10px;margin-bottom:3px}
+.history-row .num{text-align:right;font-size:13px;font-weight:600}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.setting-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+.setting-card h2{font-size:14px;margin:0}.setting-card .head{padding:16px;border-bottom:1px solid var(--line)}
+.setting-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);gap:10px}
+.setting-item:last-child{border-bottom:0}
+.setting-item .left{min-width:0}.setting-item strong{font-size:13px}.setting-item small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.fx{font-size:10px;color:var(--green);margin-top:3px}
+.modal-back{position:fixed;inset:0;background:rgba(20,25,20,.36);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.modal{background:#fff;width:min(560px,100%);border-radius:16px 16px 0 0;padding:20px;max-height:88vh;overflow:auto}
+.modal h2{margin:0 0 6px;font-size:18px}.modal p{margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.5}
+.modal .field{margin-bottom:12px}.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px}
+.field input,.field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px;outline:0}
+.modal-actions{display:flex;gap:8px;margin-top:16px}.modal-actions>*{flex:1}
+.toast{position:fixed;right:20px;bottom:20px;background:#20231f;color:#fff;padding:11px 14px;border-radius:9px;font-size:13px;z-index:200;display:none}
+.mobile-nav{display:none}
+@media(max-width:800px){
+ .sidebar{display:none}.main{margin-left:0;width:100%}.topbar{height:58px;padding:0 16px}.topbar-title{font-size:14px}
+ .page{padding:18px 14px 92px}.month-nav h1{font-size:22px}.summary{grid-template-columns:1fr 1fr}.grid,.settings-grid{grid-template-columns:1fr}
+ .history-row{grid-template-columns:1fr 1fr}.history-row .num{text-align:left}.history-row .actions{grid-column:1/-1}
+ .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;height:68px;background:#fff;border-top:1px solid var(--line);z-index:30;padding-bottom:env(safe-area-inset-bottom)}
+ .mobile-nav button{flex:1;border:0;background:transparent;color:var(--muted);font-size:11px}.mobile-nav button.active{color:var(--green);font-weight:650}
+ .review{position:sticky;bottom:76px;background:var(--bg);padding:8px 0;z-index:5}
+ .toast{left:14px;right:14px;bottom:82px}
 }
-.header-top { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 14px; }
-.header h1 { font-size: 21px; font-weight: 600; color: #fff; letter-spacing: -0.2px; }
-.header-sub { font-size: 13px; color: rgba(255,255,255,0.62); margin-top: 2px; }
-.month-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 13px; padding: 7px 13px; border-radius: 20px; cursor: pointer; font-family: var(--font); white-space: nowrap; }
-.month-btn:active { opacity: 0.75; }
-
-/* ── TABS ── */
-.tabs { display: flex; background: var(--accent-dark); padding: 0 4px; }
-.tab { flex: 1; text-align: center; padding: 11px 4px; font-size: 12px; letter-spacing: 0.04em; color: rgba(255,255,255,0.5); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; font-family: var(--font); transition: color 0.15s; }
-.tab.active { color: #fff; border-bottom-color: rgba(255,255,255,0.85); font-weight: 500; }
-
-/* ── CONTENT ── */
-.content { padding: 16px 14px 110px; max-width: 640px; margin: 0 auto; }
-
-/* ── CARD ── */
-.card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 14px; overflow: hidden; }
-.card-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
-.card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--text3); }
-.card-total { font-size: 14px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-
-/* ── EXPENSE ROW ── */
-.exp-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 16px;
-  border-bottom: 1px solid var(--border);
-  min-height: 52px;
-}
-.exp-row:last-child { border-bottom: none; }
-.exp-name { font-size: 15px; color: var(--text); line-height: 1.3; }
-.exp-date { font-size: 12px; color: var(--text3); margin-top: 2px; }
-.exp-badge-amt { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
-.exp-amt { font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; min-width: 80px; text-align: right; }
-
-/* ── FUNDING SOURCES ROW ── */
-.inc-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 16px;
-  border-bottom: 1px solid var(--border);
-  min-height: 52px;
-}
-.inc-row:last-child { border-bottom: none; }
-.inc-total-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  padding: 12px 16px;
-  background: var(--surface2);
-  min-height: 48px;
-}
-.inc-label { font-size: 15px; color: var(--text); }
-.inc-total-label { font-size: 15px; font-weight: 600; color: var(--text); }
-
-/* ── INPUT ── */
-input[type=number], input[type=text] {
-  background: var(--surface2);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  font-size: 15px;
-  font-family: var(--font);
-  color: var(--text);
-  outline: none;
-  -webkit-appearance: none;
-  transition: border-color 0.15s;
-}
-input:focus { border-color: var(--accent); background: #fff; }
-.inc-input { width: 130px; text-align: right; }
-.var-input { width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
-.formula-hint { font-size: 11px; color: var(--accent); margin-top: 3px; text-align: right; display: none; }
-
-/* ── BADGE ── */
-.badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; letter-spacing: 0.02em; white-space: nowrap; flex-shrink: 0; }
-.badge-fixed { background: var(--blue-bg); color: var(--blue-text); }
-.badge-var   { background: var(--amber-bg); color: var(--amber-text); }
-.badge-cc    { background: var(--red-bg); color: var(--red-text); }
-.badge-frozen{ background: var(--green-bg); color: var(--green-text); }
-
-/* ── METRICS ── */
-.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-.metric { background: var(--surface); border-radius: var(--radius); padding: 13px 14px; box-shadow: var(--shadow); }
-.metric-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 5px; }
-.metric-val { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
-.metric-val.pos { color: var(--green); }
-.metric-val.neg { color: var(--red); }
-.metric-val.warn { color: var(--amber); }
-
-/* ── SUGGESTION ── */
-.suggestion { background: var(--green-bg); border-left: 3px solid var(--accent); border-radius: var(--radius-sm); padding: 11px 14px; margin-bottom: 14px; }
-.suggestion-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--green); margin-bottom: 3px; }
-.suggestion-text { font-size: 13px; color: var(--green-text); line-height: 1.5; }
-
-/* ── BUTTONS ── */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 16px; border-radius: var(--radius-sm); font-size: 14px; font-family: var(--font); font-weight: 500; cursor: pointer; border: none; -webkit-appearance: none; transition: opacity 0.15s, background 0.15s; }
-.btn:active { opacity: 0.72; }
-.btn:disabled { opacity: 0.38; pointer-events: none; }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
-.btn-ghost-red { background: transparent; color: var(--red); border: 1.5px solid var(--red-bg); padding: 7px 10px; font-size: 13px; }
-.btn-cc { background: transparent; color: var(--blue); border: 1.5px solid var(--blue-bg); padding: 7px 11px; font-size: 13px; font-weight: 600; }
-.btn-full { width: 100%; }
-.btn-green { background: var(--green); color: #fff; }
-
-/* ── ADD FORM ── */
-.add-form { padding: 12px 16px; background: var(--surface2); border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.add-form input[type=text] { flex: 1; min-width: 110px; }
-.add-form select { flex-shrink: 0; }
-
-/* ── SELECT ── */
-select {
-  background: var(--surface2);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  font-size: 14px;
-  color: var(--text);
-  font-family: var(--font);
-  -webkit-appearance: none;
-  outline: none;
-}
-select:focus { border-color: var(--accent); }
-
-/* ── TALLY ── */
-.tally-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 12px; }
-.tally-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
-.tally-row:last-child { border-bottom: none; }
-.tally-row.total { font-weight: 600; font-size: 15px; background: var(--surface2); }
-.tally-diff { font-size: 22px; font-weight: 700; text-align: center; padding: 14px; border-radius: var(--radius-sm); margin: 10px 0; font-variant-numeric: tabular-nums; }
-.tally-ok   { background: var(--green-bg); color: var(--green); }
-.tally-over { background: var(--red-bg); color: var(--red); }
-.tally-under{ background: var(--amber-bg); color: var(--amber); }
-.tally-msg { font-size: 13px; text-align: center; color: var(--text2); padding: 0 8px 10px; line-height: 1.55; }
-
-/* ── MODALS ── */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
-.modal-sheet { background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; padding: 24px 18px 42px; width: 100%; max-width: 640px; max-height: 88vh; overflow-y: auto; }
-.modal-sheet h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
-.modal-sheet p { font-size: 14px; color: var(--text2); margin-bottom: 18px; line-height: 1.5; }
-.modal-btns { display: flex; gap: 10px; margin-top: 16px; }
-
-/* ── HISTORY ── */
-.hist-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; margin-bottom: 10px; cursor: pointer; }
-.hist-card:active { opacity: 0.72; }
-.hist-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.hist-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-.hist-stat { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.hist-stat-label { font-size: 11px; color: var(--text3); margin-bottom: 2px; }
-
-/* ── SETTINGS ── */
-.setting-block { padding: 14px 16px; border-bottom: 1px solid var(--border); }
-.setting-block:last-child { border-bottom: none; }
-.setting-label { font-size: 13px; color: var(--text2); margin-bottom: 7px; font-weight: 500; }
-.setting-note { font-size: 12px; color: var(--text3); margin-top: 6px; line-height: 1.6; }
-.code-box { background: #1c2118; color: #c8d8c0; border-radius: var(--radius-sm); padding: 13px 14px; font-size: 11.5px; font-family: 'Courier New', monospace; overflow-x: auto; margin: 8px 0; line-height: 1.65; white-space: pre; }
-
-/* ── FROZEN NOTICE ── */
-.frozen-notice { display: flex; align-items: center; gap: 8px; background: var(--green-bg); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: var(--green-text); font-weight: 500; }
-
-/* ── BOTTOM BAR ── */
-.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 12px 14px 32px; display: flex; gap: 10px; z-index: 90; }
-
-/* ── ALERT TOAST ── */
-.toast { padding: 11px 16px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; margin-bottom: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
-.toast-ok   { background: var(--green-bg); color: var(--green-text); }
-.toast-warn { background: var(--amber-bg); color: var(--amber-text); }
-.toast-err  { background: var(--red-bg); color: var(--red-text); }
-
-/* ── MONTH PICKER ── */
-.mpicker-item { display: flex; justify-content: space-between; align-items: center; padding: 13px 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); margin-bottom: 8px; cursor: pointer; }
-.mpicker-item.current { border-color: var(--accent); background: var(--green-bg); }
-.mpicker-item:active { opacity: 0.72; }
-
-.empty { text-align: center; padding: 28px 20px; color: var(--text3); font-size: 14px; }
-
-@media (min-width: 560px) {
-  .header { padding: 22px 20px 0; }
-  .content { padding: 18px 18px 110px; }
-  .metrics { grid-template-columns: repeat(4, 1fr); }
-  .inc-input { width: 150px; }
-}
-
-@media (min-width: 900px) {
-  body { background: #eef1ed; }
-  .header { position: sticky; top: 0; padding: 24px 28px 0; }
-  .header-top { max-width: 1180px; margin: 0 auto; }
-  .tabs { max-width: 1180px; margin: 0 auto; }
-  .content { max-width: 1180px; padding: 24px 28px 40px; }
-  #tab-plan { max-width: 980px; margin: 0 auto; }
-  #tab-history, #tab-settings { max-width: 980px; margin: 0 auto; }
-  .bottom-bar { position: sticky; bottom: 0; max-width: 980px; margin: 0 auto; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; }
-}
-
 </style>
 </head>
 <body>
-
-<div class="header">
-  <div class="header-top">
-    <div>
-      <h1>Budget Planner <span style="font-weight:400; opacity:0.72; font-size:17px;">for Sai</span></h1>
-      <div class="header-sub" id="hdr-month"></div>
-    </div>
-    <button class="month-btn" onclick="openMonthPicker()">Switch month ▾</button>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand">Budget Planner<small>Personal finance</small></div>
+  <div class="nav">
+    <button data-tab="plan" class="active" onclick="tab('plan')">Plan</button>
+    <button data-tab="history" onclick="tab('history')">History</button>
+    <button data-tab="settings" onclick="tab('settings')">Settings</button>
   </div>
-  <div class="tabs">
-    <button class="tab active" onclick="switchTab('plan')">Plan</button>
-    <button class="tab" onclick="switchTab('history')">History</button>
-    <button class="tab" onclick="switchTab('settings')">Settings</button>
+  <div class="sidebar-month"><small>Current month</small><strong id="side-month"></strong></div>
+</aside>
+<main class="main">
+  <header class="topbar">
+    <div class="topbar-title">Budget</div>
+    <div class="topbar-actions"><button class="btn" onclick="newMonth()">+ New Month</button></div>
+  </header>
+  <div class="page">
+    <section id="plan-page"></section>
+    <section id="history-page" style="display:none"></section>
+    <section id="settings-page" style="display:none"></section>
   </div>
+</main>
 </div>
+<nav class="mobile-nav">
+  <button data-tab="plan" class="active" onclick="tab('plan')">Plan</button>
+  <button data-tab="history" onclick="tab('history')">History</button>
+  <button data-tab="settings" onclick="tab('settings')">Settings</button>
+</nav>
 
-<div class="content">
-  <div id="tab-plan"></div>
-  <div id="tab-history" style="display:none;"></div>
-  <div id="tab-settings" style="display:none;"></div>
-</div>
+<div class="modal-back" id="modal" onclick="if(event.target===this)closeModal()"><div class="modal" id="modal-body"></div></div>
+<div class="toast" id="toast"></div>
 
-<div class="bottom-bar" id="bottom-bar" style="display:none;flex-direction:column;gap:6px;padding-bottom:36px;">
-  <div style="display:flex;gap:10px;width:100%;">
-    <button class="btn btn-outline" style="flex:1;" onclick="runTally()">Review Budget</button>
-    <button class="btn btn-primary" style="flex:1;" id="save-btn" onclick="trySave()" disabled>Update Sheets Now</button>
-  </div>
-  <div id="sync-timestamps" style="font-size:11px;color:var(--text3);text-align:center;display:flex;gap:12px;justify-content:center;"></div>
-</div>
-
-<!-- Authentication -->
-<div class="modal-overlay" id="auth-modal" style="display:none;align-items:center;justify-content:center;background:var(--bg);z-index:1000;">
-  <div class="modal-sheet" style="border-radius:var(--radius);max-width:420px;margin:18px;padding:28px 22px;box-shadow:var(--shadow);">
-    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px;">Budget Planner</div>
-    <h2>Sign in</h2>
-    <p>Authentication is temporarily disabled. Your budget is stored locally in this browser.</p>
-    <input type="email" id="auth-email" style="width:100%;" placeholder="you@example.com" autocomplete="email" />
-    <button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="sendMagicLink()" id="auth-btn">Sign in (later)</button>
-    <div id="auth-msg" style="font-size:12px;color:var(--text2);margin-top:12px;line-height:1.5;"></div>
-  </div>
-</div>
-
-<!-- Month picker -->
-<div class="modal-overlay" id="mpicker-modal" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal-sheet">
-    <h2 style="margin-bottom:14px;">Select Month</h2>
-    <div id="mpicker-list"></div>
-    <button class="btn btn-outline btn-full" onclick="createNewMonth()" style="margin-top:4px;">+ New Month</button>
-    <button class="btn btn-outline btn-full" onclick="document.getElementById('mpicker-modal').style.display='none'" style="margin-top:8px; color:var(--text3);">Cancel</button>
-  </div>
-</div>
-
-<!-- CC modal -->
-<div class="modal-overlay" id="cc-modal" style="display:none;">
-  <div class="modal-sheet">
-    <h2 id="cc-title">CC Payment</h2>
-    <p id="cc-desc"></p>
-    <div style="margin-bottom:4px;">
-      <div class="setting-label">Amount to pay this month</div>
-      <input type="text" id="cc-input" style="width:100%;" placeholder="Enter amount or =expression" oninput="ccFormulaHint()" />
-      <div class="formula-hint" id="cc-hint"></div>
-    </div>
-    <div class="modal-btns">
-      <button class="btn btn-outline" style="flex:1;" onclick="setCCFull()">Pay full amount</button>
-      <button class="btn btn-primary" style="flex:1;" onclick="setCCCustom()">Use this amount</button>
-    </div>
-    <button class="btn btn-outline btn-full" onclick="document.getElementById('cc-modal').style.display='none'" style="margin-top:10px;color:var(--text3);">Cancel</button>
-  </div>
-</div>
-
-<!-- Tally modal -->
-<div class="modal-overlay" id="tally-modal" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
-  <div class="modal-sheet">
-    <h2 style="margin-bottom:16px;">Review Budget</h2>
-    <div id="tally-content"></div>
-    <div class="modal-btns" id="tally-btns"></div>
-  </div>
-</div>
-
-<!-- Action menu -->
-<div class="modal-overlay" id="action-modal" style="display:none;" onclick="if(event.target===this)closeActionMenu()">
-  <div class="modal-sheet">
-    <h2 id="action-title">Edit item</h2>
-    <div id="action-content"></div>
-    <div class="modal-btns" id="action-btns"></div>
-  </div>
-</div>
-
-<!-- Toast container -->
-<div id="toasts" style="position:fixed;top:130px;left:14px;right:14px;z-index:500;pointer-events:none;"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// ─── SUPABASE CONFIG ─────────────────────────────────────────────────────────
-const SUPABASE_URL = "https://dczjjbckmulhwglosvzc.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9JbtoteK2-Po1RQucJ005A_QbDNgIjs";
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-let AUTH_USER = null;
-let DB_READY = false;
-let DB_SAVE_TIMER = null;
-let DB_LOADING = false;
+const KEY='sai_budget_v2_clean';
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DEFAULT_FIXED=[
+ {id:'f1',name:'LIC RD',amount:5500,due:'1st',raw:''},
+ {id:'f2',name:'Avi Birthday Gold RD',amount:9080,due:'28th',raw:''},
+ {id:'f3',name:'RD NPS',amount:4100,due:'2nd',raw:''},
+ {id:'f4',name:'PPF 1',amount:12500,due:'3rd',raw:''},
+ {id:'f5',name:'PPF 2',amount:12500,due:'5th',raw:''},
+ {id:'f6',name:'Avi Fees RD',amount:11483,due:'2nd',raw:''},
+ {id:'f7',name:'SIP',amount:15000,due:'5th',raw:''},
+ {id:'f8',name:'Interiors RD',amount:62811,due:'4th',raw:''}
+];
+const DEFAULT_SOURCES=['HDFC','Bank of Maharashtra','SBI','ICICI'].map((name,i)=>({id:'s'+i,name}));
 
-// ─── STATE ───────────────────────────────────────────────────────────────────
-let S = { currentKey:'', budgets:{}, fixedExpenses:[], varExpenseTemplates:[], fundingSources:[], categories:[], webhookUrl:'', lastSaved:null, lastSynced:null };
-let activeCCIdx = -1;
-let activeTab = 'plan';
+let S=load();
+let activeTab='plan';
 
-function defaultFixed() {
-  return [
-    {id:1, name:'LIC RD',            amount:5500,  date:'1st'},
-    {id:2, name:'Avi Birthday Gold RD', amount:9080, date:'28th'},
-    {id:3, name:'RD NPS',            amount:4100,  date:'2nd'},
-    {id:4, name:'PPF 1',             amount:12500, date:'3rd'},
-    {id:5, name:'PPF 2',             amount:12500, date:'5th'},
-    {id:6, name:'Avi Fees RD',       amount:11483, date:'2nd'},
-    {id:7, name:'SIP',               amount:15000, date:'5th'},
-    {id:8, name:'Interiors RD',      amount:62811, date:'4th'},
-  ];
+function emptyMonth(key){
+ return {key,status:'draft',createdAt:new Date().toISOString(),funding:[],fixed:[],planned:[]};
 }
-
-function monthKey(y,m) { return `${y}-${String(m+1).padStart(2,'0')}`; }
-function monthLabel(key) {
-  const [y,m] = key.split('-');
-  return `${MONTH_NAMES[parseInt(m)-1]} ${y}`;
+function load(){
+ try{
+   const x=JSON.parse(localStorage.getItem(KEY)||'null');
+   if(x) return x;
+ }catch(e){}
+ const now=new Date(), key=mk(now.getFullYear(),now.getMonth());
+ const s={masters:{sources:DEFAULT_SOURCES,fixed:structuredClone(DEFAULT_FIXED),recurring:[],categories:[]},months:{},current:key};
+ s.months[key]=newMonthFromMasters(key,s);
+ return s;
 }
-
-// ─── PERSISTENCE / SUPABASE ───────────────────────────────────────────────────
-function saveS() {
-  clearTimeout(DB_SAVE_TIMER);
-  saveLocalState();
-  DB_SAVE_TIMER = setTimeout(() => {
-    if (AUTH_USER?.id && AUTH_USER.id !== 'local-user') {
-      persistCurrentState().catch(e => {
-        console.error(e);
-        toast('Could not save changes to Supabase','err');
-      });
-    }
-  }, 250);
+function persist(){localStorage.setItem(KEY,JSON.stringify(S));}
+function mk(y,m){return y+'-'+String(m+1).padStart(2,'0')}
+function label(key){const [y,m]=key.split('-').map(Number);return MONTHS[m-1]+' '+y}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function money(n){return '₹'+Math.round(Number(n||0)).toLocaleString('en-IN')}
+function month(){return S.months[S.current]}
+function fixedTotal(b){return (b.fixed||[]).reduce((a,x)=>a+Number(x.amount||0),0)}
+function plannedTotal(b){return (b.planned||[]).reduce((a,x)=>a+Number(x.amount||0),0)}
+function fundsTotal(b){return (b.funding||[]).reduce((a,x)=>a+Number(x.amount||0),0)}
+function remaining(b){return fundsTotal(b)-fixedTotal(b)-plannedTotal(b)}
+function evalExpr(raw){
+ let s=String(raw??'').trim();
+ if(s==='')return 0;
+ if(!s.startsWith('=')){
+   return /^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(s)?Number(s):0;
+ }
+ const e=s.slice(1);let i=0;
+ function ws(){while(/\s/.test(e[i]||''))i++}
+ function num(){ws();const m=e.slice(i).match(/^(?:\d+(?:\.\d*)?|\.\d+)/);if(!m)throw 0;i+=m[0].length;return Number(m[0])}
+ function factor(){ws();if(e[i]==='('){i++;const v=add();ws();if(e[i]!==')')throw 0;i++;return v}if(e[i]==='-'){i++;return-factor()}return num()}
+ function mul(){let v=factor();for(;;){ws();if(e[i]==='*'){i++;v*=factor()}else if(e[i]==='/'){i++;const d=factor();if(d===0)throw 0;v/=d}else break}return v}
+ function add(){let v=mul();for(;;){ws();if(e[i]==='+'){i++;v+=mul()}else if(e[i]==='-'){i++;v-=mul()}else break}return v}
+ try{const v=add();ws();if(i!==e.length||!Number.isFinite(v))return null;return Math.round(v*100)/100}catch(e){return null}
 }
+function exprHint(raw){if(!String(raw||'').trim().startsWith('='))return '';const v=evalExpr(raw);return v===null?'Invalid formula':'= '+money(v)}
 
-function emptyBudget(key) {
-  return { key, frozen:false, fundingSnapshot:[], fixedSnapshot:[], variableExpenses:[], tallyApproved:false, createdAt:new Date().toISOString() };
+function newMonthFromMasters(key,s){
+ const b=emptyMonth(key);
+ b.funding=s.masters.sources.map(x=>({sourceId:x.id,name:x.name,amount:0,raw:''}));
+ b.fixed=s.masters.fixed.map(x=>({...x}));
+ b.planned=s.masters.recurring.map(x=>({id:'p'+Date.now()+Math.random(),name:x.name,amount:0,raw:'',due:x.due||'',isCC:!!x.isCC,category:x.category||''}));
+ return b;
 }
-
-async function sendMagicLink() {
-  const email = document.getElementById('auth-email').value.trim();
-  const msg = document.getElementById('auth-msg');
-  const btn = document.getElementById('auth-btn');
-  if (!email) { msg.textContent='Enter your email address.'; return; }
-  btn.disabled=true; btn.textContent='Sending…'; msg.textContent='';
-  const {error} = await supabaseClient.auth.signInWithOtp({
-    email,
-    options:{emailRedirectTo:'https://saicharugulla16h-byte.github.io/Sai_Home_Central/index_v2.html'}
-  });
-  if(error){ msg.textContent=error.message; btn.disabled=false; btn.textContent='Sign in (later)'; return; }
-  msg.textContent='Sign-in link sent. Check your email, then return to this page.';
-  btn.disabled=false; btn.textContent='Sign in (later)';
+function ensure(){
+ if(!S.masters)S.masters={sources:DEFAULT_SOURCES,fixed:structuredClone(DEFAULT_FIXED),recurring:[],categories:[]};
+ if(!S.months)S.months={};
+ if(!S.current||!S.months[S.current]){
+  const now=new Date(),k=mk(now.getFullYear(),now.getMonth());S.current=k;
+  if(!S.months[k])S.months[k]=newMonthFromMasters(k,S);
+ }
 }
-
-function showAuth(show) {
-  const m=document.getElementById('auth-modal');
-  if(m) m.style.display=show?'flex':'none';
+function render(){
+ ensure();persist();
+ document.getElementById('side-month').textContent=label(S.current);
+ document.getElementById('plan-page').style.display=activeTab==='plan'?'block':'none';
+ document.getElementById('history-page').style.display=activeTab==='history'?'block':'none';
+ document.getElementById('settings-page').style.display=activeTab==='settings'?'block':'none';
+ document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===activeTab));
+ if(activeTab==='plan')renderPlan();
+ if(activeTab==='history')renderHistory();
+ if(activeTab==='settings')renderSettings();
 }
-
-async function ensureProfile() {
-  const {error}=await supabaseClient.from('profiles').upsert({
-    user_id:AUTH_USER.id,
-    display_name:AUTH_USER.user_metadata?.full_name || AUTH_USER.user_metadata?.name || AUTH_USER.email?.split('@')[0] || 'Budget User'
-  },{onConflict:'user_id'});
-  if(error) throw error;
-  await supabaseClient.from('app_settings').upsert({user_id:AUTH_USER.id},{onConflict:'user_id'});
+function tab(t){activeTab=t;render()}
+function shiftMonth(dir){
+ const [y,m]=S.current.split('-').map(Number),d=new Date(y,m-1+dir,1),k=mk(d.getFullYear(),d.getMonth());
+ if(!S.months[k]){S.months[k]=newMonthFromMasters(k,S);toast(label(k)+' created')}
+ S.current=k;render()
 }
-
-async function loadRemoteState() {
-  DB_LOADING=true;
-  try {
-    await ensureProfile();
-    const [fs,fc,rs,cat,bu] = await Promise.all([
-      supabaseClient.from('funding_sources').select('*').order('sort_order'),
-      supabaseClient.from('fixed_commitments').select('*').order('sort_order'),
-      supabaseClient.from('recurring_spending').select('*').order('sort_order'),
-      supabaseClient.from('categories').select('*').order('sort_order'),
-      supabaseClient.from('budgets').select('*').order('month_start',{ascending:false})
-    ]);
-    for(const r of [fs,fc,rs,cat,bu]) if(r.error) throw r.error;
-
-    // Seed masters only for a genuinely empty account.
-    if(!fc.data.length){
-      const defaults=defaultFixed().map((e,i)=>({user_id:AUTH_USER.id,name:e.name,default_amount:e.amount,due_day:parseInt(e.date),sort_order:i,is_active:true}));
-      const {error}=await supabaseClient.from('fixed_commitments').insert(defaults); if(error) throw error;
-      fc.data=defaults.map((x,i)=>({...x,id:'seed-'+i}));
-    }
-    if(!fs.data.length){
-      const defaults=['HDFC','Bank of Maharashtra','SBI','ICICI'].map((name,i)=>({user_id:AUTH_USER.id,name,sort_order:i,is_active:true}));
-      const {error}=await supabaseClient.from('funding_sources').insert(defaults); if(error) throw error;
-      fs.data=defaults.map((x,i)=>({...x,id:'seed-fs-'+i}));
-    }
-
-    S.fixedExpenses=(fc.data||[]).filter(x=>x.is_active).map(x=>({id:x.id,name:x.name,amount:Number(x.default_amount||0),date:x.due_day?x.due_day+'th':'',rawInput:x.raw_input||''}));
-    S.varExpenseTemplates=(rs.data||[]).filter(x=>x.is_active).map(x=>({id:x.id,name:x.name,date:x.due_day?x.due_day+'th':'',isCC:!!x.is_credit_card,amount:Number(x.default_amount||0),rawInput:x.raw_input||''}));
-    S.fundingSources=(fs.data||[]).filter(x=>x.is_active).map(x=>({id:x.id,name:x.name,sortOrder:x.sort_order}));
-    S.categories=(cat.data||[]).filter(x=>x.is_active).map(x=>({id:x.id,name:x.name,sortOrder:x.sort_order}));
-    S.budgets={};
-
-    for(const row of (bu.data||[])){
-      const key=row.month_start.slice(0,7);
-      S.budgets[key]=emptyBudget(key);
-      S.budgets[key].id=row.id;
-      S.budgets[key].frozen=row.status==='finalized';
-      S.budgets[key].createdAt=row.created_at;
-      const [f,fix,p] = await Promise.all([
-        supabaseClient.from('budget_funding_sources').select('*').eq('budget_id',row.id).order('sort_order'),
-        supabaseClient.from('budget_fixed_commitments').select('*').eq('budget_id',row.id).order('sort_order'),
-        supabaseClient.from('budget_planned_spending').select('*').eq('budget_id',row.id).order('sort_order')
-      ]);
-      for(const r of [f,fix,p]) if(r.error) throw r.error;
-      const b=S.budgets[key];
-      b.fundingSnapshot=(f.data||[]).map(x=>({id:x.id,sourceId:x.source_id||null,name:x.source_name,amount:Number(x.amount||0),rawInput:x.raw_input||'',sortOrder:x.sort_order||0}));
-      b.variableExpenses=(p.data||[]).map(x=>({id:x.id,name:x.name,amount:Number(x.amount||0),rawInput:x.raw_input||'',date:x.due_day?x.due_day+'th':'',isCC:!!x.is_credit_card,category:x.category||''}));
-      // Historical fixed commitments are snapshots, not live masters.
-      if(fix.data?.length) b.fixedSnapshot=fix.data.map(x=>({id:x.id,name:x.commitment_name,amount:Number(x.amount||0),rawInput:x.raw_input||'',date:x.due_day?x.due_day+'th':''}));
-    }
-
-    const now=new Date();
-    const key=monthKey(now.getFullYear(),now.getMonth());
-    if(!S.budgets[key]){
-      await createBudgetInDb(key);
-    }
-    S.currentKey=S.currentKey && S.budgets[S.currentKey] ? S.currentKey : key;
-    DB_READY=true;
-    renderAll();
-  } finally { DB_LOADING=false; }
+function newMonth(){
+ const keys=Object.keys(S.months).sort(),last=keys[keys.length-1];
+ const [y,m]=last.split('-').map(Number),d=new Date(y,m,1),k=mk(d.getFullYear(),d.getMonth());
+ if(S.months[k]){S.current=k;render();return}
+ S.months[k]=newMonthFromMasters(k,S);S.current=k;persist();render();toast(label(k)+' created from current masters');
 }
-
-async function createBudgetInDb(key){
-  const monthStart=key+'-01';
-  const {data,error}=await supabaseClient.from('budgets')
-    .insert({user_id:AUTH_USER.id,month_start:monthStart,status:'draft'})
-    .select().single();
-  if(error) throw error;
-
-  const b=emptyBudget(key);
-  b.id=data.id;
-
-  b.fundingSnapshot=(S.fundingSources||[]).map((e,i)=>({
-    sourceId:e.id,name:e.name,amount:0,rawInput:'',sortOrder:i
-  }));
-
-  b.fixedSnapshot=(S.fixedExpenses||[]).map(e=>({
-    name:e.name,amount:Number(e.amount||0),rawInput:e.rawInput||'',date:e.date||'',id:null
-  }));
-
-  b.variableExpenses=(S.varExpenseTemplates||[]).map(e=>({
-    name:e.name,amount:0,rawInput:'',date:e.date||'',isCC:!!e.isCC,category:e.category||''
-  }));
-
-  S.budgets[key]=b;
-  await replaceBudgetChildren(b);
+function inputAmount(input,callback){
+ const raw=input.value, v=evalExpr(raw);
+ if(v===null){toast('Invalid amount or formula','error');input.focus();return}
+ callback(v,raw);persist();render();
 }
-
-function monthlyFixed(b){ return b.fixedSnapshot || S.fixedExpenses; }
-function totalFixedForBudget(b){ return monthlyFixed(b).reduce((s,e)=>s+Number(e.amount||0),0); }
-
-async function replaceBudgetChildren(b){
-  if(!b?.id || b.frozen) return;
-
-  for(const table of ['budget_funding_sources','budget_fixed_commitments','budget_planned_spending']){
-    const {error}=await supabaseClient.from(table).delete().eq('budget_id',b.id);
-    if(error) throw error;
-  }
-
-  const sourceValues=fundingSnapshot(b).map((e,i)=>({
-    budget_id:b.id,user_id:AUTH_USER.id,
-    source_id:e.sourceId||null,source_name:e.name,
-    amount:Number(e.amount||0),raw_input:e.rawInput||null,sort_order:i
-  }));
-
-  const fixedValues=monthlyFixed(b).map((e,i)=>({
-    budget_id:b.id,user_id:AUTH_USER.id,
-    commitment_name:e.name,amount:Number(e.amount||0),
-    raw_input:e.rawInput||null,due_day:e.date?parseInt(e.date):null,sort_order:i
-  }));
-
-  const plannedValues=(b.variableExpenses||[]).map((e,i)=>({
-    budget_id:b.id,user_id:AUTH_USER.id,name:e.name,
-    amount:Number(e.amount||0),raw_input:e.rawInput||null,
-    due_day:e.date?parseInt(e.date):null,is_credit_card:!!e.isCC,
-    category:e.category||null,sort_order:i
-  }));
-
-  for(const [table,values] of [
-    ['budget_funding_sources',sourceValues],
-    ['budget_fixed_commitments',fixedValues],
-    ['budget_planned_spending',plannedValues]
-  ]){
-    if(values.length){
-      const {error}=await supabaseClient.from(table).insert(values);
-      if(error) throw error;
-    }
-  }
+function renderPlan(){
+ const b=month(),fund=fundsTotal(b),fix=fixedTotal(b),plan=plannedTotal(b),rem=remaining(b);
+ let h=`<div class="month-nav">
+  <div style="display:flex;align-items:center;gap:10px"><div><h1>${label(S.current)}</h1><div style="margin-top:5px"><span class="status ${b.status==='finalized'?'final':'draft'}">${b.status==='finalized'?'Finalized':'Draft'}</span></div></div></div>
+  <div class="arrows"><button class="icon-btn" onclick="shiftMonth(-1)">‹</button><button class="icon-btn" onclick="shiftMonth(1)">›</button></div>
+ </div>`;
+ if(b.status==='finalized')h+=`<div class="notice info">This month is finalized. Its values are a historical snapshot and will not change when masters are edited. <button class="btn" style="margin-left:8px" onclick="editFinal()">Edit finalized month</button></div>`;
+ if(rem<0)h+=`<div class="notice warn">Planned spending is ${money(Math.abs(rem))} above available funds.</div>`;
+ h+=`<div class="summary">
+  ${metric('Total Funds',fund,'')}
+  ${metric('Fixed Commitments',fix,'')}
+  ${metric('Planned Spending',plan,'')}
+  ${metric('Unallocated',rem,rem<0?'negative':rem>0?'positive':'')}
+ </div>`;
+ h+=`<div class="grid">${renderFunding(b)}${renderFixed(b)}</div>${renderPlanned(b)}`;
+ if(b.status!=='finalized')h+=`<div class="review"><button class="btn" onclick="review()">Review Budget</button><button class="btn primary" onclick="finalize()">Finalize Month</button></div>`;
+ document.getElementById('plan-page').innerHTML=h;
 }
-
-async function persistCurrentState(){
-  if(!AUTH_USER||!DB_READY||AUTH_USER.id==='local-user')return;
-  const b=B();
-
-  const masterTables = [
-    ['fixed_commitments', S.fixedExpenses||[], (e,i)=>({
-      user_id:AUTH_USER.id,name:e.name,default_amount:Number(e.amount||0),
-      raw_input:e.rawInput||null,due_day:e.date?parseInt(e.date):null,
-      sort_order:i,is_active:true
-    })],
-    ['funding_sources', S.fundingSources||[], (e,i)=>({
-      user_id:AUTH_USER.id,name:e.name,sort_order:i,is_active:true
-    })],
-    ['recurring_spending', S.varExpenseTemplates||[], (e,i)=>({
-      user_id:AUTH_USER.id,name:e.name,default_amount:Number(e.amount||0),
-      raw_input:e.rawInput||null,due_day:e.date?parseInt(e.date):null,
-      is_credit_card:!!e.isCC,category:e.category||null,sort_order:i,is_active:true
-    })],
-    ['categories', S.categories||[], (e,i)=>({
-      user_id:AUTH_USER.id,name:e.name,sort_order:i,is_active:true
-    })]
-  ];
-
-  for(const [table,items,map] of masterTables){
-    if(!items.length) continue;
-    const {error}=await supabaseClient.from(table).upsert(items.map(map),{onConflict:'id'});
-    if(error) console.warn(table,error);
-  }
-
-  if(b.id){
-    const {error}=await supabaseClient.from('budgets').update({
-      status:b.frozen?'finalized':'draft',
-      finalized_at:b.frozen?(b.finalizedAt||new Date().toISOString()):null
-    }).eq('id',b.id).eq('user_id',AUTH_USER.id);
-    if(error)throw error;
-    if(!b.frozen) await replaceBudgetChildren(b);
-  } else {
-    await createBudgetInDb(S.currentKey);
-  }
+function metric(l,v,c){return `<div class="metric"><div class="label">${l}</div><div class="value ${c}">${money(v)}</div></div>`}
+function renderFunding(b){
+ let rows='';
+ (b.funding||[]).forEach((x,i)=>{
+  const hint=exprHint(x.raw);
+  rows+=`<div class="row"><div class="row-name">${esc(x.name)}</div><div><input class="row-input" value="${esc(x.raw!==''?x.raw:x.amount||'')}" placeholder="0 or =formula" onchange="setFunding(${i},this.value)">${hint?`<div class="formula">${hint}</div>`:''}</div><button class="menu-btn" onclick="itemMenu('funding',${i})">⋮</button></div>`;
+ });
+ return `<div class="card"><div class="card-head"><h2>Funding Sources</h2><span>${money(fundsTotal(b))}</span></div>${rows||'<div class="empty">No funding sources configured.</div>'}</div>`;
 }
-
-async function init() {
-  // Authentication is intentionally disabled for V2 for now.
-  // The Supabase schema/CRUD code remains in place and can be re-enabled later.
-  AUTH_USER = { id: 'local-user', email: 'local@budget-planner' };
-  DB_READY = false;
-
-  const saved = localStorage.getItem('budgetPlannerV2Local');
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      S = Object.assign(S, parsed);
-    } catch(e) {
-      console.warn('Could not load local budget data', e);
-    }
-  }
-
-  if (!S.fixedExpenses?.length) S.fixedExpenses = defaultFixed();
-  if (!S.fundingSources?.length) {
-    S.fundingSources = ['HDFC','Bank of Maharashtra','SBI','ICICI']
-      .map((name,i)=>({id:'local-fs-'+i,name,sortOrder:i}));
-  }
-  if (!S.categories) S.categories = [];
-  if (!S.varExpenseTemplates) S.varExpenseTemplates = [];
-
-  const now = new Date();
-  const key = monthKey(now.getFullYear(), now.getMonth());
-
-  if (!S.budgets[key]) {
-    S.budgets[key] = emptyBudget(key);
-    S.budgets[key].fundingSnapshot = S.fundingSources.map((e,i)=>({
-      sourceId:e.id,name:e.name,amount:0,rawInput:'',sortOrder:i
-    }));
-    S.budgets[key].fixedSnapshot = S.fixedExpenses.map(e=>({
-      name:e.name,amount:Number(e.amount||0),rawInput:e.rawInput||'',date:e.date||'',id:null
-    }));
-    S.budgets[key].variableExpenses = S.varExpenseTemplates.map(e=>({
-      name:e.name,amount:0,rawInput:'',date:e.date||'',isCC:!!e.isCC,category:e.category||''
-    }));
-    S.currentKey = key;
-  }
-
-  DB_READY = true;
-  showAuth(false);
-  renderAll();
+function renderFixed(b){
+ let rows='';
+ (b.fixed||[]).forEach((x,i)=>rows+=`<div class="row"><div><div class="row-name">${esc(x.name)}</div>${x.due?`<div class="row-sub">Due ${esc(x.due)}</div>`:''}</div><div class="amount">${money(x.amount)}</div><button class="menu-btn" onclick="itemMenu('fixed',${i})">⋮</button></div>`);
+ return `<div class="card"><div class="card-head"><h2>Fixed Commitments</h2><span>${money(fixedTotal(b))}</span></div>${rows||'<div class="empty">No fixed commitments.</div>'}</div>`;
 }
-
-function saveLocalState() {
-  try {
-    localStorage.setItem('budgetPlannerV2Local', JSON.stringify({
-      currentKey:S.currentKey,
-      budgets:S.budgets,
-      fixedExpenses:S.fixedExpenses,
-      varExpenseTemplates:S.varExpenseTemplates,
-      fundingSources:S.fundingSources,
-      categories:S.categories,
-      webhookUrl:S.webhookUrl||''
-    }));
-  } catch(e) {
-    console.warn('Could not save local state', e);
-  }
+function renderPlanned(b){
+ let rows='';
+ (b.planned||[]).forEach((x,i)=>{
+  rows+=`<div class="row"><div><div class="row-name">${esc(x.name)}</div><div class="row-sub">${x.isCC?'Credit card':(x.category||'Planned')}</div></div><div><input class="row-input" value="${esc(x.raw!==''?x.raw:x.amount||'')}" placeholder="0 or =formula" onchange="setPlanned(${i},this.value)"></div><button class="menu-btn" onclick="itemMenu('planned',${i})">⋮</button></div>`;
+ });
+ return `<div class="card"><div class="card-head"><h2>Planned Spending</h2><span>${money(plannedTotal(b))}</span></div>${rows||'<div class="empty">Nothing planned yet.</div>'}
+ <div class="add-row"><input class="name" id="new-plan-name" placeholder="Expense name"><input class="money" id="new-plan-amt" placeholder="Amount or =formula"><input id="new-plan-due" style="width:70px" placeholder="Day"><button class="btn primary" onclick="addPlanned()">Add</button></div></div>`;
 }
-
-// ─── MATHS ───────────────────────────────────────────────────────────────────
-function esc(v) {
-  return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function setFunding(i,raw){const v=evalExpr(raw);if(v===null){toast('Invalid amount or formula','error');render();return}const x=month().funding[i];x.amount=v;x.raw=String(raw||'');persist();render()}
+function setPlanned(i,raw){const v=evalExpr(raw);if(v===null){toast('Invalid amount or formula','error');render();return}const x=month().planned[i];x.amount=v;x.raw=String(raw||'');persist();render()}
+function addPlanned(){
+ const n=document.getElementById('new-plan-name').value.trim(),raw=document.getElementById('new-plan-amt').value.trim(),due=document.getElementById('new-plan-due').value.trim();
+ if(!n){toast('Enter an expense name','error');return}const v=evalExpr(raw||'0');if(v===null){toast('Invalid amount or formula','error');return}
+ month().planned.push({id:'p'+Date.now(),name:n,amount:v,raw:raw,due,isCC:false,category:''});persist();render();toast('Planned spending added')
 }
-function fmt(n) {
-  const v = Number(n || 0);
-  return '₹' + Math.round(v).toLocaleString('en-IN');
+function itemMenu(type,i){
+ const b=month(),arr=type==='fixed'?b.fixed:type==='funding'?b.funding:b.planned,x=arr[i];
+ const isMaster=false;
+ let content=`<h2>${esc(x.name)}</h2><p>Change this month's amount. This does not change the master configuration.</p>
+ <div class="field"><label>Amount</label><input id="modal-amount" value="${esc(x.raw!==''?x.raw:x.amount||'')}" placeholder="Amount or =formula"></div>
+ <div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveItem('${type}',${i})">Save</button></div>`;
+ if(type==='planned')content+=`<div class="modal-actions"><button class="btn danger" onclick="removeItem('planned',${i})">Remove from this month</button></div>`;
+ if(type==='funding')content+=`<div class="modal-actions"><button class="btn danger" onclick="removeItem('funding',${i})">Remove from this month</button></div>`;
+ document.getElementById('modal-body').innerHTML=content;document.getElementById('modal').style.display='flex';
 }
-function totalIncome(b) {
-  return (b.fundingSnapshot || []).reduce((s,e) => s + Number(e.amount || 0), 0);
+function saveItem(type,i){
+ const raw=document.getElementById('modal-amount').value,v=evalExpr(raw);if(v===null){toast('Invalid amount or formula','error');return}
+ const arr=type==='fixed'?month().fixed:type==='funding'?month().funding:month().planned;arr[i].amount=v;arr[i].raw=String(raw||'');persist();closeModal();render()
 }
-function fundingSnapshot(b) {
-  return b.fundingSnapshot || (S.fundingSources || []).map((e,i)=>({id:e.id,name:e.name,amount:0,rawInput:'',sortOrder:i}));
+function removeItem(type,i){const arr=type==='funding'?month().funding:month().planned;arr.splice(i,1);persist();closeModal();render()}
+function closeModal(){document.getElementById('modal').style.display='none'}
+function review(){
+ const b=month(),f=fundsTotal(b),x=fixedTotal(b),p=plannedTotal(b),r=remaining(b);
+ let cls=r<0?'notice warn':r===0?'notice info':'notice info';
+ document.getElementById('modal-body').innerHTML=`<h2>Review Budget</h2><p>Check the month before finalizing it.</p>
+ <div class="${cls}">Unallocated: <strong>${money(r)}</strong></div>
+ <div class="setting-item"><strong>Total Funds</strong><span>${money(f)}</span></div>
+ <div class="setting-item"><strong>Fixed Commitments</strong><span>${money(x)}</span></div>
+ <div class="setting-item"><strong>Planned Spending</strong><span>${money(p)}</span></div>
+ <div class="modal-actions"><button class="btn" onclick="closeModal()">Close</button>${r>=0?'<button class="btn primary" onclick="closeModal();finalize()">Finalize Month</button>':''}</div>`;
+ document.getElementById('modal').style.display='flex'
 }
-function totalFixed()   { return totalFixedForBudget(B()); }
-function totalVar(b)    { return (b.variableExpenses||[]).reduce((s,e)=>s+(e.amount||0),0); }
-function availForVar(b) { return totalIncome(b)-totalFixed(); }
-function remaining(b)   { return totalIncome(b)-totalFixed()-totalVar(b); }
-
-// Formula evaluator — supports =75000-10000+500 style, basic BODMAS
-function evalFormula(raw) {
-  const s=String(raw??'').trim();
-  if(!s.startsWith('=')) return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : 0;
-  const expr=s.slice(1);
-  let i=0;
-  function ws(){while(/\s/.test(expr[i]||''))i++;}
-  function number(){ws(); const m=expr.slice(i).match(/^(?:\d+(?:\.\d*)?|\.\d+)/); if(!m)throw Error('number'); i+=m[0].length; return Number(m[0]);}
-  function factor(){ws(); if(expr[i]==='('){i++;const v=add();ws();if(expr[i]!==')')throw Error(')');i++;return v;} if(expr[i]==='-'){i++;return -factor();} return number();}
-  function mul(){let v=factor();for(;;){ws();if(expr[i]==='*'){i++;v*=factor();}else if(expr[i]==='/'){i++;const d=factor();if(d===0)throw Error('division');v/=d;}else break;}return v;}
-  function add(){let v=mul();for(;;){ws();if(expr[i]==='+'){i++;v+=mul();}else if(expr[i]==='-'){i++;v-=mul();}else break;}return v;}
-  try{const result=add();ws();if(i!==expr.length||!Number.isFinite(result))return 0;return Math.round(result*100)/100;}catch(e){return 0;}
+function finalize(){
+ const b=month(),r=remaining(b);if(r<0){toast('Cannot finalize while budget is over funds','error');return}
+ if(!confirm('Finalize '+label(S.current)+'? This locks the month as a historical snapshot.'))return;
+ b.status='finalized';b.finalizedAt=new Date().toISOString();persist();render();toast(label(S.current)+' finalized')
 }
-
-function formulaPreview(raw) {
-  const s = raw.trim();
-  if (!s.startsWith('=')) return null;
-  const val = evalFormula(s);
-  return val !== 0 ? fmt(val) : null;
+function editFinal(){
+ if(!confirm('Edit this finalized month? It will return to Draft and must be finalized again.'))return;
+ month().status='draft';persist();render()
 }
-
-// ─── RENDER ALL ───────────────────────────────────────────────────────────────
-function renderAll() {
-  document.getElementById('hdr-month').textContent = monthLabel(S.currentKey);
-  // Update sync timestamps display
-  const tsEl = document.getElementById('sync-timestamps');
-  if(tsEl) {
-    const saved = S.lastSaved ? '📤 ' + new Date(S.lastSaved).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '📤 Never saved';
-    const synced = S.lastSynced ? '📥 ' + new Date(S.lastSynced).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '📥 Never synced';
-    tsEl.innerHTML = `<span>${saved}</span><span>${synced}</span>`;
-  }
-  renderPlan();
-  if (activeTab==='history') renderHistory();
-  if (activeTab==='settings') renderSettings();
-  document.getElementById('bottom-bar').style.display = activeTab==='plan' ? 'flex':'none';
-}
-
-// ─── PLAN ─────────────────────────────────────────────────────────────────────
-function renderPlan() {
-  const b=B();
-  const income=totalIncome(b);
-  const fixed=totalFixed();
-  const vari=totalVar(b);
-  const avail=availForVar(b);
-  const rem=remaining(b);
-  const frozen=b.frozen;
-  let html='';
-
-  if (frozen) html+=`<div class="frozen-notice" style="justify-content:space-between;">
-    <span>🔒 Budget finalized for ${monthLabel(S.currentKey)}</span>
-    <button class="btn btn-outline" style="font-size:12px;padding:5px 12px;color:var(--amber-text);border-color:var(--amber-bg);" onclick="confirmUnfreeze()">✏️ Edit / Unfreeze</button>
+function renderHistory(){
+ const keys=Object.keys(S.months).sort().reverse();
+ let h=`<div class="month-nav"><h1>History</h1><button class="btn primary" onclick="newMonth()">+ New Month</button></div>`;
+ if(!keys.length)h+='<div class="empty">No months yet.</div>';
+ let year='';
+ keys.forEach(k=>{
+  const b=S.months[k],y=k.slice(0,4);
+  if(y!==year){year=y;h+=`<div class="history-year">${y}</div>`}
+  const r=remaining(b);
+  h+=`<div class="history-row" onclick="S.current='${k}';tab('plan')">
+    <div><small>Month</small><strong>${label(k)}</strong></div>
+    <div class="num"><small>Funds</small>${money(fundsTotal(b))}</div>
+    <div class="num"><small>Fixed</small>${money(fixedTotal(b))}</div>
+    <div class="num"><small>Planned</small>${money(plannedTotal(b))}</div>
+    <div class="actions"><span class="status ${b.status==='finalized'?'final':'draft'}">${b.status==='finalized'?'Finalized':'Draft'}</span></div>
   </div>`;
-
-  // Funding Sources card
-  html+=`<div class="card">
-    <div class="card-header"><span class="card-title">Funding Sources</span><span class="card-total">${fmt(income)}</span></div>`;
-  fundingSnapshot(b).forEach((e,i)=>{
-    html+=`<div class="inc-row">
-      <span class="inc-label">${esc(e.name)}</span>
-      ${frozen
-        ? `<span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(e.amount||0)}</span>`
-        : `<div style="display:flex;flex-direction:column;align-items:flex-end;">
-             <input type="text" class="inc-input" value="${esc(e.rawInput || (e.amount||''))}" placeholder="0 or =expr"
-               oninput="fundingInputChange(${i},this.value)"
-               onchange="fundingInputCommit(${i},this.value)" />
-             <div class="formula-hint" id="fsource-hint-${i}"></div>
-           </div>`
-      }
-    </div>`;
-  });
-  html+=`<div class="inc-total-row">
-    <span class="inc-total-label">Total Funds</span>
-    <span style="font-size:16px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;">${fmt(income)}</span>
-  </div></div>`;
-
-  // Metrics
-  html+=`<div class="metrics">
-    <div class="metric"><div class="metric-label">Fixed Commitments</div><div class="metric-val">${fmt(fixed)}</div></div>
-    <div class="metric"><div class="metric-label">Planned Spending</div><div class="metric-val">${fmt(vari)}</div></div>
-    <div class="metric"><div class="metric-label">Available for var.</div><div class="metric-val ${avail<0?'neg':'pos'}">${fmt(avail)}</div></div>
-    <div class="metric"><div class="metric-label">Remaining</div><div class="metric-val ${rem<0?'neg':rem===0?'pos':'warn'}">${fmt(rem)}</div></div>
-  </div>`;
-
-  // Guidance
-  if (income>0 && !frozen) {
-    let msg='';
-    if (avail<=0) msg=`Fixed Commitments (${fmt(fixed)}) exceed your income. Please review.`;
-    else if (vari===0) msg=`After Fixed Commitments, you have ${fmt(avail)} available for Planned Spending.`;
-    else if (rem<0) msg=`Planned Spending exceed available budget by ${fmt(Math.abs(rem))}. Consider reducing.`;
-    else if (rem<avail*0.05) msg=`Excellent — only ${fmt(rem)} unallocated. Budget is nearly fully planned.`;
-    else { const pct=Math.round(vari/avail*100); msg=`${pct}% of available budget allocated. ${fmt(rem)} still unallocated.`; }
-    html+=`<div class="suggestion"><div class="suggestion-title">💡 Budget Guidance</div><div class="suggestion-text">${msg}</div></div>`;
-  }
-
-  // Fixed Commitments
-  html+=`<div class="card">
-    <div class="card-header"><span class="card-title">Fixed Commitments</span><span class="card-total">${fmt(fixed)}</span></div>`;
-  monthlyFixed(b).forEach((e,i)=>{
-    html+=`<div class="exp-row">
-      <div><div class="exp-name">${esc(e.name)}</div>${e.date?`<div class="exp-date">Due ${esc(e.date)}</div>`:''}</div>
-      <div class="exp-badge-amt">
-        <span class="badge badge-fixed">Fixed</span>
-        <span class="exp-amt">${fmt(e.amount)}</span>
-        ${!frozen?`<button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="openFixedMenu(${i})">⋮</button>`:''}
-      </div>
-    </div>`;
-  });
-  html+=`</div>`;
-
-  // Planned Spending
-  html+=`<div class="card">
-    <div class="card-header"><span class="card-title">Planned Spending</span><span class="card-total">${fmt(vari)}</span></div>`;
-  const vars=b.variableExpenses||[];
-  if (!vars.length) html+=`<div class="empty">No Planned Spending yet.<br>Add CC payments, home expenses, etc.</div>`;
-  vars.forEach((e,i)=>{
-    html+=`<div class="exp-row" style="grid-template-columns:1fr auto;">
-      <div><div class="exp-name">${e.name}</div>${e.date?`<div class="exp-date">Due ${e.date}</div>`:''}</div>
-      <div class="exp-badge-amt">
-        <span class="badge ${e.isCC?'badge-cc':'badge-var'}">${e.isCC?'CC':'Variable'}</span>
-        ${frozen
-          ? `<span class="exp-amt">${fmt(e.amount||0)}</span>`
-          : `<div style="display:flex;flex-direction:column;align-items:flex-end;">
-               <input type="text" class="var-input" value="${e.rawInput||e.amount||''}" placeholder="0 or =expr"
-                 oninput="varInputChange(${i},this.value)"
-                 onchange="varInputCommit(${i},this.value)"
-                 onfocus="this.select()" />
-               <div class="formula-hint" id="fhint-${i}"></div>
-             </div>`
-        }
-        ${e.isCC&&!frozen ? `<button class="btn btn-cc" onclick="openCC(${i})">CC</button>` : ''}
-        ${!frozen ? `<button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="openVarMenu(${i})">⋮</button>` : ''}
-      </div>
-    </div>`;
-  });
-
-  if (!frozen) {
-    html+=`<div class="add-form">
-      <input type="text" id="nv-name" placeholder="Expense name" style="flex:1;min-width:100px;" />
-      <input type="text" id="nv-amt" placeholder="Amount or =expr" style="width:120px;" />
-      <select id="nv-date" style="width:72px;">
-        <option value="">Day</option>
-        ${Array.from({length:31},(_,i)=>`<option value="${i+1}th">${i+1}</option>`).join('')}
-      </select>
-      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text2);cursor:pointer;white-space:nowrap;">
-        <input type="checkbox" id="nv-cc" style="width:16px;height:16px;accent-color:var(--accent);" /> CC
-      </label>
-      <button class="btn btn-primary" onclick="addVar()">Add</button>
-    </div>`;
-  }
-  html+=`</div>`;
-
-  // Freeze
-  if (!frozen) html+=`<button class="btn btn-primary btn-full" style="margin-bottom:14px;" onclick="confirmFreeze()">🔒 Finalize Month</button>`;
-
-  document.getElementById('tab-plan').innerHTML = html;
+ });
+ document.getElementById('history-page').innerHTML=h;
 }
-
-// ─── FUNDING SOURCES ───────────────────────────────────────────────────────────────────
-function setIncome(field, val) {
-  const b=B();
-  const resolved = evalFormula(val);
-  b[field] = resolved;
-  b.tallyApproved=false;
-  document.getElementById('save-btn').disabled=true;
-  // Replace input with resolved value
-  const idMap = {hdfc:'inc-hdfc',bom:'inc-bom',sbi:'inc-sbi',icici:'inc-icici'};
-  const el = document.getElementById(idMap[field]||'');
-  if (el) el.value = resolved || '';
-  saveS(); renderPlan();
+function renderSettings(){
+ const m=S.masters;
+ document.getElementById('settings-page').innerHTML=`
+ <div class="month-nav"><h1>Settings</h1></div>
+ <div class="settings-grid">
+  ${masterCard('Funding Sources',m.sources.map((x,i)=>settingRow(x.name,'',()=>editMaster('source',i)),()=>addMaster('source')))}
+  ${masterCard('Fixed Commitments',m.fixed.map((x,i)=>settingRow(x.name,(x.due?'Due '+x.due+' · ':'')+money(x.amount),()=>editMaster('fixed',i)),()=>addMaster('fixed')))}
+  ${masterCard('Recurring Spending',m.recurring.map((x,i)=>settingRow(x.name,(x.due?'Due '+x.due+' · ':'')+(x.isCC?'Credit card':''),()=>editMaster('recurring',i)),()=>addMaster('recurring')))}
+  ${masterCard('Categories',m.categories.map((x,i)=>settingRow(x.name,'',()=>removeMaster('category',i)),()=>addMaster('category')))}
+ </div>
+ <div class="setting-card" style="margin-top:14px"><div class="head"><h2>Google Sheets</h2></div>
+  <div style="padding:16px"><div class="field"><label>Apps Script Web App URL</label><input id="sheets-url" value="${esc(S.sheetsUrl||'')}" placeholder="Paste your existing Apps Script Web App URL"></div>
+  <button class="btn primary" onclick="saveSheets()">Save connection</button>
+  <div style="font-size:11px;color:var(--muted);margin-top:9px">The existing spreadsheet remains the reporting layer. This setting is ready for the Sheets bridge; it does not create a new spreadsheet.</div></div>
+ </div>
+ <div class="setting-card" style="margin-top:14px"><div class="head"><h2>Local data</h2></div>
+  <div style="padding:16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="exportData()">Backup data</button><button class="btn danger" onclick="resetData()">Reset V2 data</button></div>
+ </div>`;
 }
-
-// ─── VARIABLE INPUTS ─────────────────────────────────────────────────────────
-function varInputChange(i, raw) {
-  const hint=document.getElementById('fhint-'+i);
-  if (!hint) return;
-  const preview=formulaPreview(raw);
-  if (preview) { hint.textContent='= '+preview; hint.style.display='block'; }
-  else { hint.style.display='none'; }
+function masterCard(title,body,add){
+ return `<div class="setting-card"><div class="head"><h2>${title}</h2></div>${body||'<div class="empty">None configured.</div>'}<div class="add-row"><button class="btn primary" onclick="${add.name}()">+ Add</button></div></div>`
 }
-
-function varInputCommit(i, raw) {
-  const b=B();
-  const val = evalFormula(raw);
-  b.variableExpenses[i].rawInput = String(raw || '');
-  b.variableExpenses[i].amount = val;
-  b.tallyApproved=false;
-  document.getElementById('save-btn').disabled=true;
-  // Replace input value with resolved number, hide hint
-  const inputs = document.querySelectorAll('.var-input');
-  if (inputs[i]) inputs[i].value = val || '';
-  const hint = document.getElementById('fhint-'+i);
-  if (hint) hint.style.display='none';
-  saveS(); renderPlan();
+function settingRow(name,sub,fn){return `<div class="setting-item"><div class="left"><strong>${esc(name)}</strong><small>${esc(sub)}</small></div><button class="menu-btn" onclick="${fn.name}()">⋮</button></div>`}
+function addMaster(type){
+ let title=type==='source'?'Funding Source':type==='fixed'?'Fixed Commitment':type==='recurring'?'Recurring Spending':'Category';
+ let fields=`<div class="field"><label>Name</label><input id="m-name" placeholder="${title}"></div>`;
+ if(type==='fixed'||type==='recurring')fields+=`<div class="field"><label>${type==='fixed'?'Default amount':'Default amount'}</label><input id="m-amt" placeholder="Amount or =formula"></div><div class="field"><label>Due day</label><input id="m-due" placeholder="e.g. 5th"></div>`;
+ if(type==='recurring')fields+=`<div class="field"><label>Type</label><select id="m-cc"><option value="0">Planned</option><option value="1">Credit card</option></select></div>`;
+ document.getElementById('modal-body').innerHTML=`<h2>Add ${title}</h2>${fields}<div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="saveMaster('${type}',-1)">Add</button></div>`;
+ document.getElementById('modal').style.display='flex'
 }
-
-function addVar() {
-  const name=document.getElementById('nv-name').value.trim();
-  const raw=document.getElementById('nv-amt').value.trim();
-  const date=document.getElementById('nv-date').value;
-  const isCC=document.getElementById('nv-cc').checked;
-  if (!name) { toast('Enter an expense name','warn'); return; }
-  const amt=evalFormula(raw||'0');
-  const b=B();
-  if (!b.variableExpenses) b.variableExpenses=[];
-  b.variableExpenses.push({name, amount:amt, rawInput:raw||'', date, isCC});
-  b.tallyApproved=false;
-  document.getElementById('save-btn').disabled=true;
-  saveS(); renderPlan();
-  // Auto-open CC modal if CC and no amount
-  if (isCC && !amt) { const idx=b.variableExpenses.length-1; openCC(idx); }
+function editMaster(type,i){
+ const arr=type==='source'?S.masters.sources:type==='fixed'?S.masters.fixed:S.masters.recurring,x=arr[i];
+ let fields=`<div class="field"><label>Name</label><input id="m-name" value="${esc(x.name)}"></div>`;
+ if(type==='fixed'||type==='recurring')fields+=`<div class="field"><label>Default amount</label><input id="m-amt" value="${esc(x.raw||x.amount||'')}" placeholder="Amount or =formula"></div><div class="field"><label>Due day</label><input id="m-due" value="${esc(x.due||'')}"></div>`;
+ if(type==='recurring')fields+=`<div class="field"><label>Type</label><select id="m-cc"><option value="0" ${!x.isCC?'selected':''}>Planned</option><option value="1" ${x.isCC?'selected':''}>Credit card</option></select></div>`;
+ document.getElementById('modal-body').innerHTML=`<h2>Edit ${esc(x.name)}</h2><p>Changes apply to future months only. Existing months keep their snapshots.</p>${fields}<div class="modal-actions"><button class="btn danger" onclick="removeMaster('${type}',${i})">Archive</button><button class="btn primary" onclick="saveMaster('${type}',${i})">Save</button></div>`;
+ document.getElementById('modal').style.display='flex'
 }
-
-function removeVar(i) {
-  const b=B(); b.variableExpenses.splice(i,1);
-  b.tallyApproved=false;
-  saveS(); renderPlan();
+function saveMaster(type,i){
+ const name=document.getElementById('m-name').value.trim();if(!name){toast('Enter a name','error');return}
+ let x={id:(type[0]||'x')+Date.now(),name};
+ if(type==='fixed'||type==='recurring'){
+  const raw=document.getElementById('m-amt').value.trim(),v=evalExpr(raw||'0');if(v===null){toast('Invalid amount or formula','error');return}
+  x.amount=v;x.raw=raw;x.due=document.getElementById('m-due').value.trim();
+ }
+ if(type==='recurring'){x.isCC=document.getElementById('m-cc').value==='1';x.category=''}
+ if(type==='source')x.name=name;
+ const arr=type==='source'?S.masters.sources:type==='fixed'?S.masters.fixed:S.masters.recurring;
+ if(i<0)arr.push(x);else{const old=arr[i];x.id=old.id;arr[i]=x}
+ persist();closeModal();renderSettings();toast('Master updated')
 }
-
-// ─── CC MODAL ─────────────────────────────────────────────────────────────────
-function openCC(i) {
-  const b=B(); const e=b.variableExpenses[i];
-  activeCCIdx=i;
-  document.getElementById('cc-title').textContent=e.name;
-  document.getElementById('cc-desc').textContent=`Current amount: ${fmt(e.amount||0)}. Enter the full outstanding balance or a custom amount you want to pay this month. You can type a formula like =75000-5000.`;
-  document.getElementById('cc-input').value=e.rawInput||e.amount||'';
-  document.getElementById('cc-hint').style.display='none';
-  document.getElementById('cc-modal').style.display='flex';
+function removeMaster(type,i){
+ if(!confirm('Archive this master? Existing months will not change.'))return;
+ const arr=type==='source'?S.masters.sources:type==='fixed'?S.masters.fixed:S.masters.recurring;
+ arr.splice(i,1);persist();closeModal();renderSettings()
 }
-
-function ccFormulaHint() {
-  const raw=document.getElementById('cc-input').value;
-  const hint=document.getElementById('cc-hint');
-  const preview=formulaPreview(raw);
-  if (preview) { hint.textContent='= '+preview; hint.style.display='block'; }
-  else hint.style.display='none';
+function removeCategory(i){if(confirm('Remove this category from future setup?')){S.masters.categories.splice(i,1);persist();renderSettings()}}
+function saveSheets(){S.sheetsUrl=document.getElementById('sheets-url').value.trim();persist();toast('Google Sheets setting saved')}
+function exportData(){
+ const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='budget-planner-backup.json';a.click();URL.revokeObjectURL(a.href)
 }
-
-function setCCFull() {
-  const raw=document.getElementById('cc-input').value;
-  applyCC(raw);
-}
-function setCCCustom() {
-  const raw=document.getElementById('cc-input').value;
-  applyCC(raw);
-}
-function applyCC(raw) {
-  if (activeCCIdx<0) return;
-  const b=B();
-  b.variableExpenses[activeCCIdx].amount=evalFormula(raw||'0');
-  b.variableExpenses[activeCCIdx].rawInput=raw;
-  b.tallyApproved=false;
-  document.getElementById('save-btn').disabled=true;
-  document.getElementById('cc-modal').style.display='none';
-  activeCCIdx=-1;
-  saveS(); renderPlan();
-}
-
-
-function fundingInputChange(i, raw){
-  const hint=document.getElementById('fsource-hint-'+i);
-  const preview=formulaPreview(raw);
-  if(hint){ hint.textContent=preview?'= '+preview:''; hint.style.display=preview?'block':'none'; }
-}
-function fundingInputCommit(i, raw){
-  const b=B(), f=fundingSnapshot(b)[i];
-  if(!f)return;
-  f.rawInput=String(raw||'');
-  f.amount=evalFormula(raw||'0');
-  b.tallyApproved=false;
-  saveS(); renderPlan();
-}
-
-function openFixedMenu(i){
-  const e=monthlyFixed(B())[i];
-  if(!e)return;
-  document.getElementById('action-title').textContent=e.name;
-  document.getElementById('action-content').innerHTML=`
-    <div class="setting-label">Amount</div>
-    <input type="text" id="action-amount" style="width:100%;" value="${esc(e.rawInput || e.amount || '')}" placeholder="Amount or =expression"
-      oninput="actionFormulaHint()">
-    <div class="formula-hint" id="action-hint"></div>`;
-  document.getElementById('action-btns').innerHTML=`
-    <button class="btn btn-outline" style="flex:1;" onclick="closeActionMenu()">Cancel</button>
-    <button class="btn btn-primary" style="flex:1;" onclick="saveFixedMenu(${i})">Save</button>`;
-  document.getElementById('action-modal').style.display='flex';
-}
-function saveFixedMenu(i){
-  const e=monthlyFixed(B())[i], raw=document.getElementById('action-amount').value;
-  e.rawInput=String(raw||''); e.amount=evalFormula(raw||'0');
-  B().tallyApproved=false; closeActionMenu(); saveS(); renderPlan();
-}
-function openVarMenu(i){
-  const e=B().variableExpenses[i];
-  document.getElementById('action-title').textContent=e.name;
-  document.getElementById('action-content').innerHTML=`
-    <div class="setting-label">Amount</div>
-    <input type="text" id="action-amount" style="width:100%;" value="${esc(e.rawInput || e.amount || '')}" placeholder="Amount or =expression"
-      oninput="actionFormulaHint()">
-    <div class="formula-hint" id="action-hint"></div>
-    <div class="setting-note">Changes apply only to ${monthLabel(S.currentKey)}.</div>`;
-  document.getElementById('action-btns').innerHTML=`
-    <button class="btn btn-outline" style="flex:1;" onclick="closeActionMenu()">Cancel</button>
-    <button class="btn btn-outline" style="flex:1;color:var(--red);" onclick="removeVarFromMenu(${i})">Remove</button>
-    <button class="btn btn-primary" style="flex:1;" onclick="saveVarMenu(${i})">Save</button>`;
-  document.getElementById('action-modal').style.display='flex';
-}
-function saveVarMenu(i){
-  const e=B().variableExpenses[i], raw=document.getElementById('action-amount').value;
-  e.rawInput=String(raw||''); e.amount=evalFormula(raw||'0');
-  B().tallyApproved=false; closeActionMenu(); saveS(); renderPlan();
-}
-function removeVarFromMenu(i){ removeVar(i); closeActionMenu(); }
-function actionFormulaHint(){
-  const raw=document.getElementById('action-amount')?.value||'';
-  const hint=document.getElementById('action-hint');
-  const p=formulaPreview(raw);
-  if(hint){hint.textContent=p?'= '+p:'';hint.style.display=p?'block':'none';}
-}
-function closeActionMenu(){document.getElementById('action-modal').style.display='none';}
-
-// ─── FREEZE ───────────────────────────────────────────────────────────────────
-function confirmFreeze() {
-  const b=B();
-  if (!b.tallyApproved) { toast('Review the budget before finalizing','warn'); return; }
-  b.frozen=true; saveS(); renderAll();
-  toast(`Budget finalized for ${monthLabel(S.currentKey)} 🔒`,'ok');
-}
-
-function confirmUnfreeze() {
-  const label=monthLabel(S.currentKey);
-  const overlay=document.createElement('div');
-  overlay.className='modal-overlay';
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;display:flex;align-items:flex-end;justify-content:center;';
-  overlay.innerHTML=`<div class="modal-sheet" style="max-width:640px;">
-    <h2>Unfreeze ${label}?</h2>
-    <p>This will unlock the budget so you can make changes. After editing, run Tally again and re-save to keep your Google Sheet in sync.</p>
-    <div class="modal-btns">
-      <button class="btn btn-outline" style="flex:1;" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-      <button class="btn btn-primary" style="flex:1;background:var(--amber);border-color:var(--amber);" onclick="doUnfreeze(this)">✏️ Unfreeze & Edit</button>
-    </div>
-  </div>`;
-  document.body.appendChild(overlay);
-}
-
-function doUnfreeze(el) {
-  el.closest('.modal-overlay').remove();
-  const b=B();
-  b.frozen=false;
-  b.tallyApproved=false;
-  document.getElementById('save-btn').disabled=true;
-  saveS(); renderAll();
-  toast(`${monthLabel(S.currentKey)} unfrozen — edit, re-tally, then save`,'warn');
-}
-
-// ─── TALLY ────────────────────────────────────────────────────────────────────
-function runTally() {
-  const b=B();
-  const income=totalIncome(b);
-  const fixed=totalFixed();
-  const vari=totalVar(b);
-  const total=fixed+vari;
-  const diff=income-total;
-
-  const cls=diff===0?'tally-ok':diff<0?'tally-over':'tally-under';
-  const diffLabel=diff===0?'✓ Perfectly balanced':diff<0?`▲ Over budget by ${fmt(Math.abs(diff))}`:`${fmt(diff)} unallocated`;
-  let advice='';
-  if (diff<0) advice=`You are over by ${fmt(Math.abs(diff))}. Reduce Planned Spending to balance. Fixed Commitments are locked for this month.`;
-  else if (diff===0) advice='Every rupee is accounted for. Budget is perfectly balanced.';
-  else if (diff<income*0.05) advice=`Almost fully allocated — ${fmt(diff)} left. You may top up a variable item or carry it forward.`;
-  else advice=`${fmt(diff)} is unallocated. Consider adding it to a variable category or treating it as savings.`;
-
-  let varRows='';
-  (b.variableExpenses||[]).forEach(e=>{
-    varRows+=`<div class="tally-row"><span>${e.name}${e.date?` <small style="color:var(--text3)">(${e.date})</small>`:''}</span><span>${fmt(e.amount||0)}</span></div>`;
-  });
-
-  const html=`
-    <div class="tally-card">
-      <div class="tally-row"><span>Total income</span><span style="font-weight:600;">${fmt(income)}</span></div>
-      <div class="tally-row"><span>Fixed Commitments</span><span>${fmt(fixed)}</span></div>
-      <div class="tally-row"><span>Planned Spending</span><span>${fmt(vari)}</span></div>
-      <div class="tally-row total"><span>Total outgoing</span><span>${fmt(total)}</span></div>
-    </div>
-    <div class="tally-diff ${cls}">${diffLabel}</div>
-    <div class="tally-msg">${advice}</div>
-    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin:12px 0 8px;">Variable breakdown</div>
-    <div class="tally-card">
-      ${varRows||'<div class="empty" style="padding:14px;">No Planned Spending</div>'}
-    </div>`;
-
-  document.getElementById('tally-content').innerHTML=html;
-  let btns=`<button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('tally-modal').style.display='none'">Close</button>`;
-  if (diff<=0) btns+=`<button class="btn btn-green" style="flex:1;" onclick="approveTally()">✓ Approve</button>`;
-  else btns+=`<button class="btn btn-outline" style="flex:1;color:var(--amber-text);" onclick="approveTally()">Save anyway</button>`;
-  document.getElementById('tally-btns').innerHTML=btns;
-  document.getElementById('tally-modal').style.display='flex';
-}
-
-function approveTally() {
-  const b=B(); b.tallyApproved=true; saveS();
-  document.getElementById('save-btn').disabled=false;
-  document.getElementById('tally-modal').style.display='none';
-  toast('Budget review approved — you can now save or freeze','ok');
-}
-
-// ─── SAVE TO SHEETS ───────────────────────────────────────────────────────────
-async function trySave() {
-  const b=B();
-  if (!b.tallyApproved&&!b.frozen) { toast('Review the budget first','warn'); return; }
-  if (!S.webhookUrl) { toast('Add your Apps Script URL in Settings','warn'); return; }
-  const btn=document.getElementById('save-btn');
-  btn.textContent='Saving…'; btn.disabled=true;
-  const label=monthLabel(S.currentKey);
-  const income=totalIncome(b); const fixed=totalFixed(); const vari=totalVar(b);
-  // Build snapshot of all data for cross-device sync
-  const snapshot = { budgets: S.budgets, fixedExpenses: S.fixedExpenses };
-  const rows=[
-    [`BUDGET — ${label}`, b.frozen?'FROZEN':'DRAFT','',''],
-    ['','','',''],
-    ['FUNDING SOURCES','','',''],
-    ['HDFC','',b.hdfc||0,''],
-    ['Bank of Maharashtra','',b.bom||0,''],
-    ['SBI','',b.sbi||0,''],
-    ['ICICI','',b.icici||0,''],
-    ['Total Income','',income,''],
-    ['','','',''],
-    ['FIXED COMMITMENTS','Amount','Due',''],
-    ...monthlyFixed(b).map(e=>[e.name,e.amount,e.date||'','Fixed']),
-    ['Fixed Commitments Total',fixed,'',''],
-    ['','','',''],
-    ['PLANNED SPENDING','Amount','Due','Type'],
-    ...(b.variableExpenses||[]).map(e=>[e.name,e.amount||0,e.date||'',e.isCC?'CC':'Variable']),
-    ['Planned Spending Total',vari,'',''],
-    ['','','',''],
-    ['TOTAL OUTGOING',fixed+vari,'',''],
-    ['REMAINING',income-fixed-vari,'',''],
-  ];
-  try {
-    // Use a hidden form POST — bypasses CORS entirely, works on all browsers
-    await postViaForm(S.webhookUrl, {month:label, rows, snapshot});
-    toast(`✓ Saved to Google Sheets — ${label}`,'ok');
-    btn.textContent='Saved locally ✓';
-  } catch(e) {
-    toast('Could not reach Sheets. Check your Apps Script URL.','err');
-    btn.textContent='Update Sheets Now'; btn.disabled=false;
-  }
-}
-
-// ─── HISTORY ─────────────────────────────────────────────────────────────────
-function renderHistory() {
-  const keys=Object.keys(S.budgets).sort().reverse();
-  const lastSyncStr = S.lastSynced
-    ? `Last synced: ${new Date(S.lastSynced).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`
-    : 'Never synced from Sheets';
-  const lastSaveStr = S.lastSaved
-    ? `Last saved to Sheets: ${new Date(S.lastSaved).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`
-    : 'Never saved to Sheets';
-  const syncBar=`<div style="margin-bottom:14px;">
-    <button class="btn btn-outline btn-full" onclick="syncFromSheets()" style="margin-bottom:8px;">☁️ Sync from Sheets</button>
-    <div style="font-size:12px;color:var(--text3);display:flex;flex-direction:column;gap:3px;padding:0 2px;">
-      <span>📥 ${lastSyncStr}</span>
-      <span>📤 ${lastSaveStr}</span>
-    </div>
-  </div>`;
-  if (!keys.length) {
-    document.getElementById('tab-history').innerHTML=syncBar+'<div class="empty">No local history yet.<br>Sync from Sheets to load all devices\' data.</div>';
-    return;
-  }
-  let html='';
-  keys.forEach(k=>{
-    const b=S.budgets[k];
-    const inc=totalIncome(b);
-    const fix=totalFixedForBudget(b);
-    const vr=totalVar(b);
-    const rem=inc-fix-vr;
-    html+=`<div class="hist-card" onclick="loadMonth('${k}')">
-      <div class="hist-meta">
-        <span style="font-size:16px;font-weight:600;">${monthLabel(k)}</span>
-        ${b.frozen?'<span class="badge badge-frozen">Frozen</span>':'<span class="badge badge-var">Draft</span>'}
-      </div>
-      <div class="hist-grid">
-        <div><div class="hist-stat-label">Income</div><div class="hist-stat">${fmt(inc)}</div></div>
-        <div><div class="hist-stat-label">Outgoing</div><div class="hist-stat">${fmt(fix+vr)}</div></div>
-        <div><div class="hist-stat-label">Remaining</div><div class="hist-stat" style="color:${rem<0?'var(--red)':'var(--green)'}">${fmt(rem)}</div></div>
-      </div>
-    </div>`;
-  });
-  document.getElementById('tab-history').innerHTML=syncBar+html;
-}
-
-// ─── FORM POST (bypasses CORS, body always arrives) ─────────────────────────
-function postViaForm(url, payload) {
-  return new Promise((resolve) => {
-    // Create a hidden iframe to receive the response
-    const iframe = document.createElement('iframe');
-    iframe.name = 'bp_post_frame';
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-
-    // Create a hidden form — uses application/x-www-form-urlencoded
-    // which Apps Script reads via e.parameter.payload
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = url;
-    form.target = 'bp_post_frame';
-    form.enctype = 'application/x-www-form-urlencoded';
-    form.style.display = 'none';
-
-    // Add payload as a single hidden field
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.value = JSON.stringify(payload);
-    form.appendChild(input);
-
-    document.body.appendChild(form);
-
-    // Clean up after submit
-    iframe.onload = () => {
-      setTimeout(() => {
-        form.remove();
-        iframe.remove();
-        resolve();
-      }, 500);
-    };
-
-    form.submit();
-  });
-}
-
-// ─── SYNC FROM SHEETS ────────────────────────────────────────────────────────
-async function syncFromSheets() {
-  if (!S.webhookUrl) { toast('Add your Apps Script URL in Settings first','warn'); return; }
-  const btn = document.querySelector('[onclick="syncFromSheets()"]');
-  if (btn) { btn.textContent='⏳ Syncing…'; btn.disabled=true; }
-  try {
-    const url = S.webhookUrl + '?action=load';
-    const r = await fetch(url, { method:'GET', mode:'no-cors' });
-    // no-cors returns opaque — we can't read the body directly.
-    // Instead use an iframe trick via JSONP-style doGet
-    fetchViaScript(S.webhookUrl + '?action=load&callback=onSheetsData');
-  } catch(e) {
-    if (btn) { btn.textContent='☁️ Sync from Sheets'; btn.disabled=false; }
-    toast('Sync failed. Check your Apps Script URL.','err');
-  }
-}
-
-function fetchViaScript(url) {
-  // Remove any existing callback script
-  const old = document.getElementById('jsonp-loader');
-  if (old) old.remove();
-  window.onSheetsData = function(data) {
-    const old2 = document.getElementById('jsonp-loader');
-    if (old2) old2.remove();
-    if (!data || !data.budgets) { toast('No data found in Sheets','warn'); return; }
-    // Merge: remote data wins for any month key, local kept if not in remote
-    let merged = 0;
-    Object.keys(data.budgets).forEach(k => {
-      if (!S.budgets[k]) {
-        S.budgets[k] = data.budgets[k];
-        merged++;
-      } else {
-        // Remote frozen overrides local draft
-        if (data.budgets[k].frozen && !S.budgets[k].frozen) {
-          S.budgets[k] = data.budgets[k];
-          merged++;
-        }
-      }
-    });
-    // Also restore fixedExpenses if local is default and remote has more
-    if (data.fixedExpenses && data.fixedExpenses.length > S.fixedExpenses.length) {
-      S.fixedExpenses = data.fixedExpenses;
-    }
-    saveS();
-    renderAll();
-    S.lastSynced = new Date().toISOString();
-    saveS();
-    toast(merged > 0 ? `✓ Synced — ${merged} month(s) loaded from Sheets` : '✓ Already up to date','ok');
-    const btn = document.querySelector('[onclick="syncFromSheets()"]');
-    if (btn) { btn.textContent='☁️ Sync from Sheets'; btn.disabled=false; }
-  };
-  const s = document.createElement('script');
-  s.id = 'jsonp-loader';
-  s.src = url;
-  s.onerror = () => {
-    toast('Could not reach Sheets. Check URL in Settings.','err');
-    const btn = document.querySelector('[onclick="syncFromSheets()"]');
-    if (btn) { btn.textContent='☁️ Sync from Sheets'; btn.disabled=false; }
-  };
-  document.body.appendChild(s);
-}
-
-// ─── SETTINGS ────────────────────────────────────────────────────────────────
-function renderSettings() {
-  const fixedRows=(S.fixedExpenses||[]).map((e,i)=>`
-    <div class="exp-row">
-      <div><div class="exp-name">${esc(e.name)}</div>${e.date?`<div class="exp-date">Due ${esc(e.date)}</div>`:''}</div>
-      <div class="exp-badge-amt">
-        <span class="exp-amt">${fmt(e.amount)}</span>
-        <button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="editFixedMaster(${i})">⋮</button>
-      </div>
-    </div>`).join('');
-
-  const sourceRows=(S.fundingSources||[]).map((e,i)=>`
-    <div class="exp-row">
-      <div class="exp-name">${esc(e.name)}</div>
-      <button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="editFundingMaster(${i})">⋮</button>
-    </div>`).join('');
-
-  const varRows=(S.varExpenseTemplates||[]).map((e,i)=>`
-    <div class="exp-row">
-      <div><div class="exp-name">${esc(e.name)}</div>${e.date?`<div class="exp-date">Due ${esc(e.date)}</div>`:''}</div>
-      <div class="exp-badge-amt">
-        ${e.isCC?'<span class="badge badge-cc">CC</span>':''}
-        <button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="editVarMaster(${i})">⋮</button>
-      </div>
-    </div>`).join('');
-
-  const catRows=(S.categories||[]).map((e,i)=>`
-    <div class="exp-row">
-      <div class="exp-name">${esc(e.name)}</div>
-      <button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="removeCategory(${i})">✕</button>
-    </div>`).join('');
-
-  const scriptCode = `function doPost(e) {
-  try {
-    var raw = e && e.parameter && e.parameter.payload ? e.parameter.payload : '{}';
-    var data = JSON.parse(raw);
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(data.month);
-    if (!sheet) sheet = ss.insertSheet(data.month);
-    sheet.clearContents();
-    (data.rows || []).forEach(function(row, i) {
-      sheet.getRange(i+1,1,1,row.length).setValues([row]);
-    });
-    if (data.summary) {
-      var s = ss.getSheetByName('Summary');
-      if (!s) s = ss.insertSheet('Summary');
-      var values = data.summary;
-      if (values.length) s.getRange(1,1,values.length,values[0].length).setValues(values);
-    }
-    return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({status:'error',message:String(err)}))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-function doGet(e) {
-  return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
-    .setMimeType(ContentService.MimeType.JSON);
-}`;
-
-  document.getElementById('tab-settings').innerHTML=`
-    <div class="card">
-      <div class="card-header"><span class="card-title">Funding Sources</span></div>
-      ${sourceRows||'<div class="empty">No funding sources.</div>'}
-      <div class="add-form">
-        <input type="text" id="fs-name" placeholder="Source name">
-        <button class="btn btn-primary" onclick="addFundingMaster()">Add</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><span class="card-title">Fixed Commitments</span><span class="card-total">${fmt((S.fixedExpenses||[]).reduce((a,e)=>a+Number(e.amount||0),0))}</span></div>
-      ${fixedRows||'<div class="empty">No fixed commitments.</div>'}
-      <div class="add-form">
-        <input type="text" id="nf-name" placeholder="Commitment name">
-        <input type="text" id="nf-amt" placeholder="Amount or =expr" style="width:130px;">
-        <select id="nf-date" style="width:72px;"><option value="">Day</option>${Array.from({length:31},(_,i)=>`<option value="${i+1}th">${i+1}</option>`).join('')}</select>
-        <button class="btn btn-primary" onclick="addFixed()">Add</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><span class="card-title">Recurring Spending</span></div>
-      ${varRows||'<div class="empty">No recurring spending.</div>'}
-      <div class="add-form">
-        <input type="text" id="vt-name" placeholder="Expense name">
-        <input type="text" id="vt-amt" placeholder="Default amount or =expr" style="width:130px;">
-        <select id="vt-date" style="width:72px;"><option value="">Day</option>${Array.from({length:31},(_,i)=>`<option value="${i+1}th">${i+1}</option>`).join('')}</select>
-        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text2);"><input type="checkbox" id="vt-cc"> CC</label>
-        <button class="btn btn-primary" onclick="addVarTemplate()">Add</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><span class="card-title">Categories</span></div>
-      ${catRows||'<div class="empty">No categories yet.</div>'}
-      <div class="add-form">
-        <input type="text" id="cat-name" placeholder="Category name">
-        <button class="btn btn-primary" onclick="addCategory()">Add</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><span class="card-title">Google Sheets</span></div>
-      <div class="setting-block">
-        <div class="setting-label">Apps Script Web App URL</div>
-        <input type="text" id="webhook-input" style="width:100%;" value="${esc(S.webhookUrl||'')}" placeholder="https://script.google.com/macros/s/…/exec">
-        <button class="btn btn-primary btn-full" onclick="saveWebhook()" style="margin-top:10px;">Save URL</button>
-        <button class="btn btn-outline btn-full" id="test-btn" onclick="testConnection()" style="margin-top:8px;">Test connection</button>
-        <div class="setting-note">Updates the existing monthly tab in your existing spreadsheet. A tab is created only when that month does not already exist.</div>
-      </div>
-      <div class="setting-block">
-        <div class="setting-label">One-time setup</div>
-        <div class="setting-note">Paste the Apps Script below into the Apps Script project attached to your existing spreadsheet and deploy it as a Web App. The spreadsheet remains the reporting layer; Supabase remains the application data store.</div>
-        <div class="code-box">${esc(scriptCode)}</div>
-      </div>
-    </div>`;
-}
-
-function saveWebhook() {
-  S.webhookUrl=document.getElementById('webhook-input').value.trim();
-  saveS(); toast('Google Sheets connection saved','ok');
-}
-
-function addFundingMaster(){
-  const name=document.getElementById('fs-name').value.trim();
-  if(!name){toast('Enter a source name','warn');return;}
-  S.fundingSources.push({id:'local-'+Date.now(),name,sortOrder:S.fundingSources.length});
-  saveS();renderSettings();
-}
-function editFundingMaster(i){
-  const e=S.fundingSources[i]; if(!e)return;
-  openMasterAction('Funding Source',e.name,'',raw=>{
-    const n=String(raw).trim(); if(!n)return;
-    e.name=n;
-    // Existing monthly snapshots remain unchanged.
-    saveS();renderSettings();
-  },()=>{ S.fundingSources.splice(i,1); saveS();renderSettings(); });
-}
-
-function editFixedMaster(i){
-  const e=S.fixedExpenses[i]; if(!e)return;
-  openMasterAmountAction('Fixed Commitment',e.name,e.amount,e.rawInput||'',(name,raw)=>{
-    e.name=name; e.rawInput=raw; e.amount=evalFormula(raw||'0');
-    saveS();renderSettings();
-  },()=>{ S.fixedExpenses.splice(i,1); saveS();renderSettings(); });
-}
-function addFixed() {
-  const name=document.getElementById('nf-name').value.trim();
-  const raw=document.getElementById('nf-amt').value.trim();
-  const date=document.getElementById('nf-date').value;
-  if(!name||!raw){toast('Enter name and amount','warn');return;}
-  const amt=evalFormula(raw);
-  S.fixedExpenses.push({id:'local-'+Date.now(),name,amount:amt,rawInput:raw,date});
-  saveS(); renderSettings();
-}
-
-function editVarMaster(i){
-  const e=S.varExpenseTemplates[i]; if(!e)return;
-  openMasterAmountAction('Recurring Spending',e.name,e.amount,e.rawInput||'',(name,raw)=>{
-    e.name=name; e.rawInput=raw; e.amount=evalFormula(raw||'0');
-    saveS();renderSettings();
-  },()=>{ S.varExpenseTemplates.splice(i,1); saveS();renderSettings(); });
-}
-function addVarTemplate() {
-  const name=document.getElementById('vt-name').value.trim();
-  const raw=document.getElementById('vt-amt').value.trim();
-  const date=document.getElementById('vt-date').value;
-  const isCC=document.getElementById('vt-cc').checked;
-  if(!name){toast('Enter an expense name','warn');return;}
-  const amt=evalFormula(raw||'0');
-  S.varExpenseTemplates.push({id:'local-'+Date.now(),name,date,isCC,amount:amt,rawInput:raw});
-  saveS();renderSettings();
-}
-
-function addCategory(){
-  const name=document.getElementById('cat-name').value.trim();
-  if(!name){toast('Enter a category name','warn');return;}
-  S.categories.push({id:'local-'+Date.now(),name,sortOrder:S.categories.length});
-  saveS();renderSettings();
-}
-function removeCategory(i){S.categories.splice(i,1);saveS();renderSettings();}
-
-function openMasterAction(title,name,amount,onSave,onRemove){
-  document.getElementById('action-title').textContent=title;
-  document.getElementById('action-content').innerHTML=`
-    <div class="setting-label">Name</div>
-    <input type="text" id="master-name" style="width:100%;" value="${esc(name)}">
-    <div class="setting-note">Changes apply to future months. Existing month snapshots are unchanged.</div>`;
-  document.getElementById('action-btns').innerHTML=`
-    <button class="btn btn-outline" style="flex:1;" onclick="closeActionMenu()">Cancel</button>
-    <button class="btn btn-outline" style="flex:1;color:var(--red);" onclick="masterRemove()">Archive / Remove</button>
-    <button class="btn btn-primary" style="flex:1;" onclick="masterSave()">Save</button>`;
-  window.__masterSave=()=>onSave(document.getElementById('master-name').value);
-  window.__masterRemove=onRemove;
-  document.getElementById('action-modal').style.display='flex';
-}
-function openMasterAmountAction(title,name,amount,raw,onSave,onRemove){
-  document.getElementById('action-title').textContent=title;
-  document.getElementById('action-content').innerHTML=`
-    <div class="setting-label">Name</div>
-    <input type="text" id="master-name" style="width:100%;" value="${esc(name)}">
-    <div class="setting-label" style="margin-top:12px;">Default amount</div>
-    <input type="text" id="master-amount" style="width:100%;" value="${esc(raw || amount || '')}" placeholder="Amount or =expression" oninput="masterFormulaHint()">
-    <div class="formula-hint" id="master-hint"></div>
-    <div class="setting-note">Changes apply to future months. Existing month snapshots are unchanged.</div>`;
-  document.getElementById('action-btns').innerHTML=`
-    <button class="btn btn-outline" style="flex:1;" onclick="closeActionMenu()">Cancel</button>
-    <button class="btn btn-outline" style="flex:1;color:var(--red);" onclick="masterRemove()">Archive / Remove</button>
-    <button class="btn btn-primary" style="flex:1;" onclick="masterSaveAmount()">Save</button>`;
-  window.__masterSaveAmount=()=>onSave(document.getElementById('master-name').value,document.getElementById('master-amount').value);
-  window.__masterRemove=onRemove;
-  document.getElementById('action-modal').style.display='flex';
-}
-function masterSave(){ if(window.__masterSave)window.__masterSave(); closeActionMenu(); }
-function masterSaveAmount(){ if(window.__masterSaveAmount)window.__masterSaveAmount(); closeActionMenu(); }
-function masterRemove(){ if(window.__masterRemove)window.__masterRemove(); closeActionMenu(); }
-function masterFormulaHint(){
-  const raw=document.getElementById('master-amount')?.value||'', p=formulaPreview(raw), h=document.getElementById('master-hint');
-  if(h){h.textContent=p?'= '+p:'';h.style.display=p?'block':'none';}
-}
-
-
-// ─── MONTH MANAGEMENT ────────────────────────────────────────────────────────
-function openMonthPicker() {
-  const keys=Object.keys(S.budgets).sort().reverse();
-  let html='';
-  keys.forEach(k=>{
-    const b=S.budgets[k];
-    html+=`<div class="mpicker-item ${k===S.currentKey?'current':''}" onclick="loadMonth('${k}')">
-      <span style="font-size:15px;font-weight:500;">${monthLabel(k)}</span>
-      ${b.frozen?'<span class="badge badge-frozen">Frozen</span>':'<span class="badge badge-var">Draft</span>'}
-    </div>`;
-  });
-  document.getElementById('mpicker-list').innerHTML=html||'<div class="empty">No months yet</div>';
-  document.getElementById('mpicker-modal').style.display='flex';
-}
-
-function loadMonth(key) {
-  S.currentKey=key;
-  if(!S.budgets[key]) S.budgets[key]=emptyBudget(key);
-  saveS();
-  document.getElementById('mpicker-modal').style.display='none';
-  renderAll();
-}
-
-async function createNewMonth() {
-  const keys=Object.keys(S.budgets).sort();
-  let next;
-  if(keys.length){
-    const last=keys[keys.length-1];
-    const [y,m]=last.split('-').map(Number);
-    const d=new Date(y,m,1);
-    next=monthKey(d.getFullYear(),d.getMonth());
-  } else {
-    const now=new Date();
-    next=monthKey(now.getFullYear(),now.getMonth());
-  }
-
-  if(S.budgets[next]){
-    S.currentKey=next;
-    document.getElementById('mpicker-modal').style.display='none';
-    renderAll();
-    return;
-  }
-
-  try{
-    await createBudgetInDb(next);
-    S.currentKey=next;
-    document.getElementById('mpicker-modal').style.display='none';
-    renderAll();
-    toast(`Created ${monthLabel(next)} from current masters`,'ok');
-  }catch(e){
-    console.error(e);
-    toast('Could not create month: '+e.message,'err');
-  }
-}
-
-// ─── TABS ─────────────────────────────────────────────────────────────────────
-function switchTab(t) {
-  activeTab=t;
-  ['plan','history','settings'].forEach(n=>{ document.getElementById('tab-'+n).style.display=n===t?'block':'none'; });
-  document.querySelectorAll('.tab').forEach((el,i)=>{ el.classList.toggle('active',['plan','history','settings'][i]===t); });
-  document.getElementById('bottom-bar').style.display=t==='plan'?'flex':'none';
-  if(t==='history') renderHistory();
-  if(t==='settings') renderSettings();
-}
-
-// ─── TOAST ────────────────────────────────────────────────────────────────────
-function toast(msg,type) {
-  const c=document.getElementById('toasts');
-  const el=document.createElement('div');
-  el.className=`toast toast-${type==='ok'?'ok':type==='warn'?'warn':'err'}`;
-  el.textContent=msg; el.style.pointerEvents='auto';
-  c.appendChild(el);
-  setTimeout(()=>el.remove(),3500);
-}
-
-init();
+function resetData(){if(confirm('Reset all V2 local data? This cannot be undone.')){localStorage.removeItem(KEY);S=load();render();toast('V2 data reset')}}
+function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',2200)}
+ensure();render();
 </script>
 </body>
 </html>
