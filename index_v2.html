@@ -85,7 +85,7 @@ html, body { min-height: 100%; background: var(--bg); font-family: var(--font); 
 .exp-badge-amt { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .exp-amt { font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; min-width: 80px; text-align: right; }
 
-/* ── INCOME ROW ── */
+/* ── FUNDING SOURCES ROW ── */
 .inc-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -234,6 +234,18 @@ select:focus { border-color: var(--accent); }
   .metrics { grid-template-columns: repeat(4, 1fr); }
   .inc-input { width: 150px; }
 }
+
+@media (min-width: 900px) {
+  body { background: #eef1ed; }
+  .header { position: sticky; top: 0; padding: 24px 28px 0; }
+  .header-top { max-width: 1180px; margin: 0 auto; }
+  .tabs { max-width: 1180px; margin: 0 auto; }
+  .content { max-width: 1180px; padding: 24px 28px 40px; }
+  #tab-plan { max-width: 980px; margin: 0 auto; }
+  #tab-history, #tab-settings { max-width: 980px; margin: 0 auto; }
+  .bottom-bar { position: sticky; bottom: 0; max-width: 980px; margin: 0 auto; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; }
+}
+
 </style>
 </head>
 <body>
@@ -261,7 +273,7 @@ select:focus { border-color: var(--accent); }
 
 <div class="bottom-bar" id="bottom-bar" style="display:none;flex-direction:column;gap:6px;padding-bottom:36px;">
   <div style="display:flex;gap:10px;width:100%;">
-    <button class="btn btn-outline" style="flex:1;" onclick="runTally()">📊 Tally</button>
+    <button class="btn btn-outline" style="flex:1;" onclick="runTally()">Review Budget</button>
     <button class="btn btn-primary" style="flex:1;" id="save-btn" onclick="trySave()" disabled>Update Sheets Now</button>
   </div>
   <div id="sync-timestamps" style="font-size:11px;color:var(--text3);text-align:center;display:flex;gap:12px;justify-content:center;"></div>
@@ -310,9 +322,18 @@ select:focus { border-color: var(--accent); }
 <!-- Tally modal -->
 <div class="modal-overlay" id="tally-modal" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal-sheet">
-    <h2 style="margin-bottom:16px;">Budget Tally</h2>
+    <h2 style="margin-bottom:16px;">Review Budget</h2>
     <div id="tally-content"></div>
     <div class="modal-btns" id="tally-btns"></div>
+  </div>
+</div>
+
+<!-- Action menu -->
+<div class="modal-overlay" id="action-modal" style="display:none;" onclick="if(event.target===this)closeActionMenu()">
+  <div class="modal-sheet">
+    <h2 id="action-title">Edit item</h2>
+    <div id="action-content"></div>
+    <div class="modal-btns" id="action-btns"></div>
   </div>
 </div>
 
@@ -334,7 +355,7 @@ let DB_LOADING = false;
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
-let S = { currentKey:'', budgets:{}, fixedExpenses:[], varExpenseTemplates:[], webhookUrl:'', lastSaved:null, lastSynced:null };
+let S = { currentKey:'', budgets:{}, fixedExpenses:[], varExpenseTemplates:[], fundingSources:[], categories:[], webhookUrl:'', lastSaved:null, lastSynced:null };
 let activeCCIdx = -1;
 let activeTab = 'plan';
 
@@ -368,7 +389,7 @@ function saveS() {
 }
 
 function emptyBudget(key) {
-  return { key, frozen:false, hdfc:0, bom:0, sbi:0, icici:0, variableExpenses:[], tallyApproved:false, createdAt:new Date().toISOString() };
+  return { key, frozen:false, fundingSnapshot:[], fixedSnapshot:[], variableExpenses:[], tallyApproved:false, createdAt:new Date().toISOString() };
 }
 
 async function sendMagicLink() {
@@ -379,7 +400,7 @@ async function sendMagicLink() {
   btn.disabled=true; btn.textContent='Sending…'; msg.textContent='';
   const {error} = await supabaseClient.auth.signInWithOtp({
     email,
-    options:{emailRedirectTo:window.location.origin + window.location.pathname}
+    options:{emailRedirectTo:'https://saicharugulla16h-byte.github.io/Sai_Home_Central/index_v2.html'}
   });
   if(error){ msg.textContent=error.message; btn.disabled=false; btn.textContent='Send sign-in link'; return; }
   msg.textContent='Sign-in link sent. Check your email, then return to this page.';
@@ -428,6 +449,7 @@ async function loadRemoteState() {
     S.fixedExpenses=(fc.data||[]).filter(x=>x.is_active).map(x=>({id:x.id,name:x.name,amount:Number(x.default_amount||0),date:x.due_day?x.due_day+'th':'',rawInput:x.raw_input||''}));
     S.varExpenseTemplates=(rs.data||[]).filter(x=>x.is_active).map(x=>({id:x.id,name:x.name,date:x.due_day?x.due_day+'th':'',isCC:!!x.is_credit_card,amount:Number(x.default_amount||0),rawInput:x.raw_input||''}));
     S.fundingSources=(fs.data||[]).filter(x=>x.is_active).map(x=>({id:x.id,name:x.name,sortOrder:x.sort_order}));
+    S.categories=(cat.data||[]).filter(x=>x.is_active).map(x=>({id:x.id,name:x.name,sortOrder:x.sort_order}));
     S.budgets={};
 
     for(const row of (bu.data||[])){
@@ -443,7 +465,7 @@ async function loadRemoteState() {
       ]);
       for(const r of [f,fix,p]) if(r.error) throw r.error;
       const b=S.budgets[key];
-      (f.data||[]).forEach(x=>{ const n=(x.source_name||'').toLowerCase(); if(n==='hdfc')b.hdfc=Number(x.amount||0); else if(n==='bank of maharashtra')b.bom=Number(x.amount||0); else if(n==='sbi')b.sbi=Number(x.amount||0); else if(n==='icici')b.icici=Number(x.amount||0); });
+      b.fundingSnapshot=(f.data||[]).map(x=>({id:x.id,sourceId:x.source_id||null,name:x.source_name,amount:Number(x.amount||0),rawInput:x.raw_input||'',sortOrder:x.sort_order||0}));
       b.variableExpenses=(p.data||[]).map(x=>({id:x.id,name:x.name,amount:Number(x.amount||0),rawInput:x.raw_input||'',date:x.due_day?x.due_day+'th':'',isCC:!!x.is_credit_card,category:x.category||''}));
       // Historical fixed commitments are snapshots, not live masters.
       if(fix.data?.length) b.fixedSnapshot=fix.data.map(x=>({id:x.id,name:x.commitment_name,amount:Number(x.amount||0),rawInput:x.raw_input||'',date:x.due_day?x.due_day+'th':''}));
@@ -462,11 +484,26 @@ async function loadRemoteState() {
 
 async function createBudgetInDb(key){
   const monthStart=key+'-01';
-  const {data,error}=await supabaseClient.from('budgets').insert({user_id:AUTH_USER.id,month_start:monthStart,status:'draft'}).select().single();
+  const {data,error}=await supabaseClient.from('budgets')
+    .insert({user_id:AUTH_USER.id,month_start:monthStart,status:'draft'})
+    .select().single();
   if(error) throw error;
-  const b=emptyBudget(key); b.id=data.id;
-  b.fixedSnapshot=S.fixedExpenses.map((e,i)=>({name:e.name,amount:e.amount,rawInput:e.rawInput||'',date:e.date,id:null}));
-  b.variableExpenses=(S.varExpenseTemplates||[]).map(e=>({name:e.name,amount:0,rawInput:'',date:e.date||'',isCC:!!e.isCC,category:e.category||''}));
+
+  const b=emptyBudget(key);
+  b.id=data.id;
+
+  b.fundingSnapshot=(S.fundingSources||[]).map((e,i)=>({
+    sourceId:e.id,name:e.name,amount:0,rawInput:'',sortOrder:i
+  }));
+
+  b.fixedSnapshot=(S.fixedExpenses||[]).map(e=>({
+    name:e.name,amount:Number(e.amount||0),rawInput:e.rawInput||'',date:e.date||'',id:null
+  }));
+
+  b.variableExpenses=(S.varExpenseTemplates||[]).map(e=>({
+    name:e.name,amount:0,rawInput:'',date:e.date||'',isCC:!!e.isCC,category:e.category||''
+  }));
+
   S.budgets[key]=b;
   await replaceBudgetChildren(b);
 }
@@ -476,31 +513,82 @@ function totalFixedForBudget(b){ return monthlyFixed(b).reduce((s,e)=>s+Number(e
 
 async function replaceBudgetChildren(b){
   if(!b?.id || b.frozen) return;
-  await supabaseClient.from('budget_funding_sources').delete().eq('budget_id',b.id);
-  await supabaseClient.from('budget_fixed_commitments').delete().eq('budget_id',b.id);
-  await supabaseClient.from('budget_planned_spending').delete().eq('budget_id',b.id);
-  const sourceValues=(S.fundingSources||[{name:'HDFC'},{name:'Bank of Maharashtra'},{name:'SBI'},{name:'ICICI'}]).map((src,i)=>{
-    const n=src.name.toLowerCase(); let amount=0;
-    if(n==='hdfc')amount=b.hdfc||0; else if(n==='bank of maharashtra')amount=b.bom||0; else if(n==='sbi')amount=b.sbi||0; else if(n==='icici')amount=b.icici||0;
-    return {budget_id:b.id,user_id:AUTH_USER.id,source_name:src.name,amount,sort_order:i};
-  });
-  const fixedValues=monthlyFixed(b).map((e,i)=>({budget_id:b.id,user_id:AUTH_USER.id,commitment_name:e.name,amount:Number(e.amount||0),raw_input:e.rawInput||'',due_day:e.date?parseInt(e.date):null,sort_order:i}));
-  const plannedValues=(b.variableExpenses||[]).map((e,i)=>({budget_id:b.id,user_id:AUTH_USER.id,name:e.name,amount:Number(e.amount||0),raw_input:e.rawInput||'',due_day:e.date?parseInt(e.date):null,is_credit_card:!!e.isCC,category:e.category||null,sort_order:i}));
-  for(const [table,values] of [['budget_funding_sources',sourceValues],['budget_fixed_commitments',fixedValues],['budget_planned_spending',plannedValues]]){
-    if(values.length){const {error}=await supabaseClient.from(table).insert(values); if(error)throw error;}
+
+  for(const table of ['budget_funding_sources','budget_fixed_commitments','budget_planned_spending']){
+    const {error}=await supabaseClient.from(table).delete().eq('budget_id',b.id);
+    if(error) throw error;
+  }
+
+  const sourceValues=fundingSnapshot(b).map((e,i)=>({
+    budget_id:b.id,user_id:AUTH_USER.id,
+    source_id:e.sourceId||null,source_name:e.name,
+    amount:Number(e.amount||0),raw_input:e.rawInput||null,sort_order:i
+  }));
+
+  const fixedValues=monthlyFixed(b).map((e,i)=>({
+    budget_id:b.id,user_id:AUTH_USER.id,
+    commitment_name:e.name,amount:Number(e.amount||0),
+    raw_input:e.rawInput||null,due_day:e.date?parseInt(e.date):null,sort_order:i
+  }));
+
+  const plannedValues=(b.variableExpenses||[]).map((e,i)=>({
+    budget_id:b.id,user_id:AUTH_USER.id,name:e.name,
+    amount:Number(e.amount||0),raw_input:e.rawInput||null,
+    due_day:e.date?parseInt(e.date):null,is_credit_card:!!e.isCC,
+    category:e.category||null,sort_order:i
+  }));
+
+  for(const [table,values] of [
+    ['budget_funding_sources',sourceValues],
+    ['budget_fixed_commitments',fixedValues],
+    ['budget_planned_spending',plannedValues]
+  ]){
+    if(values.length){
+      const {error}=await supabaseClient.from(table).insert(values);
+      if(error) throw error;
+    }
   }
 }
 
 async function persistCurrentState(){
   if(!AUTH_USER||!DB_READY)return;
   const b=B();
-  // Masters
-  const {error:fcErr}=await supabaseClient.from('fixed_commitments').upsert((S.fixedExpenses||[]).map((e,i)=>({id:(typeof e.id==='string'&&e.id.length>10)?e.id:undefined,user_id:AUTH_USER.id,name:e.name,default_amount:Number(e.amount||0),raw_input:e.rawInput||null,due_day:e.date?parseInt(e.date):null,sort_order:i,is_active:true})),{onConflict:'id'});
-  if(fcErr) console.warn(fcErr);
+
+  const masterTables = [
+    ['fixed_commitments', S.fixedExpenses||[], (e,i)=>({
+      user_id:AUTH_USER.id,name:e.name,default_amount:Number(e.amount||0),
+      raw_input:e.rawInput||null,due_day:e.date?parseInt(e.date):null,
+      sort_order:i,is_active:true
+    })],
+    ['funding_sources', S.fundingSources||[], (e,i)=>({
+      user_id:AUTH_USER.id,name:e.name,sort_order:i,is_active:true
+    })],
+    ['recurring_spending', S.varExpenseTemplates||[], (e,i)=>({
+      user_id:AUTH_USER.id,name:e.name,default_amount:Number(e.amount||0),
+      raw_input:e.rawInput||null,due_day:e.date?parseInt(e.date):null,
+      is_credit_card:!!e.isCC,category:e.category||null,sort_order:i,is_active:true
+    })],
+    ['categories', S.categories||[], (e,i)=>({
+      user_id:AUTH_USER.id,name:e.name,sort_order:i,is_active:true
+    })]
+  ];
+
+  for(const [table,items,map] of masterTables){
+    if(!items.length) continue;
+    const {error}=await supabaseClient.from(table).upsert(items.map(map),{onConflict:'id'});
+    if(error) console.warn(table,error);
+  }
+
   if(b.id){
-    const {error}=await supabaseClient.from('budgets').update({status:b.frozen?'finalized':'draft',finalized_at:b.frozen?new Date().toISOString():null}).eq('id',b.id).eq('user_id',AUTH_USER.id); if(error)throw error;
+    const {error}=await supabaseClient.from('budgets').update({
+      status:b.frozen?'finalized':'draft',
+      finalized_at:b.frozen?(b.finalizedAt||new Date().toISOString()):null
+    }).eq('id',b.id).eq('user_id',AUTH_USER.id);
+    if(error)throw error;
     if(!b.frozen) await replaceBudgetChildren(b);
-  } else { await createBudgetInDb(S.currentKey); }
+  } else {
+    await createBudgetInDb(S.currentKey);
+  }
 }
 
 async function init() {
@@ -516,8 +604,19 @@ async function init() {
 
 
 // ─── MATHS ───────────────────────────────────────────────────────────────────
-function fmt(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
-function totalIncome(b) { return (b.hdfc||0)+(b.bom||0)+(b.sbi||0)+(b.icici||0); }
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmt(n) {
+  const v = Number(n || 0);
+  return '₹' + Math.round(v).toLocaleString('en-IN');
+}
+function totalIncome(b) {
+  return (b.fundingSnapshot || []).reduce((s,e) => s + Number(e.amount || 0), 0);
+}
+function fundingSnapshot(b) {
+  return b.fundingSnapshot || (S.fundingSources || []).map((e,i)=>({id:e.id,name:e.name,amount:0,rawInput:'',sortOrder:i}));
+}
 function totalFixed()   { return totalFixedForBudget(B()); }
 function totalVar(b)    { return (b.variableExpenses||[]).reduce((s,e)=>s+(e.amount||0),0); }
 function availForVar(b) { return totalIncome(b)-totalFixed(); }
@@ -576,42 +675,27 @@ function renderPlan() {
     <button class="btn btn-outline" style="font-size:12px;padding:5px 12px;color:var(--amber-text);border-color:var(--amber-bg);" onclick="confirmUnfreeze()">✏️ Edit / Unfreeze</button>
   </div>`;
 
-  // Income card
+  // Funding Sources card
   html+=`<div class="card">
-    <div class="card-header"><span class="card-title">Opening Balances</span></div>
-    <div class="inc-row">
-      <span class="inc-label">HDFC</span>
+    <div class="card-header"><span class="card-title">Funding Sources</span><span class="card-total">${fmt(income)}</span></div>`;
+  fundingSnapshot(b).forEach((e,i)=>{
+    html+=`<div class="inc-row">
+      <span class="inc-label">${esc(e.name)}</span>
       ${frozen
-        ? `<span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(b.hdfc||0)}</span>`
-        : `<input type="text" id="inc-hdfc" class="inc-input" value="${b.hdfc||''}" placeholder="0 or =expr" onchange="setIncome('hdfc',this.value)" />`
+        ? `<span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(e.amount||0)}</span>`
+        : `<div style="display:flex;flex-direction:column;align-items:flex-end;">
+             <input type="text" class="inc-input" value="${esc(e.rawInput || (e.amount||''))}" placeholder="0 or =expr"
+               oninput="fundingInputChange(${i},this.value)"
+               onchange="fundingInputCommit(${i},this.value)" />
+             <div class="formula-hint" id="fsource-hint-${i}"></div>
+           </div>`
       }
-    </div>
-    <div class="inc-row">
-      <span class="inc-label">Bank of Maharashtra</span>
-      ${frozen
-        ? `<span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(b.bom||0)}</span>`
-        : `<input type="text" id="inc-bom" class="inc-input" value="${b.bom||''}" placeholder="0 or =expr" onchange="setIncome('bom',this.value)" />`
-      }
-    </div>
-    <div class="inc-row">
-      <span class="inc-label">SBI</span>
-      ${frozen
-        ? `<span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(b.sbi||0)}</span>`
-        : `<input type="text" id="inc-sbi" class="inc-input" value="${b.sbi||''}" placeholder="0 or =expr" onchange="setIncome('sbi',this.value)" />`
-      }
-    </div>
-    <div class="inc-row">
-      <span class="inc-label">ICICI</span>
-      ${frozen
-        ? `<span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(b.icici||0)}</span>`
-        : `<input type="text" id="inc-icici" class="inc-input" value="${b.icici||''}" placeholder="0 or =expr" onchange="setIncome('icici',this.value)" />`
-      }
-    </div>
-    <div class="inc-total-row">
-      <span class="inc-total-label">Total Income</span>
-      <span style="font-size:16px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;">${fmt(income)}</span>
-    </div>
-  </div>`;
+    </div>`;
+  });
+  html+=`<div class="inc-total-row">
+    <span class="inc-total-label">Total Funds</span>
+    <span style="font-size:16px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;">${fmt(income)}</span>
+  </div></div>`;
 
   // Metrics
   html+=`<div class="metrics">
@@ -625,7 +709,7 @@ function renderPlan() {
   if (income>0 && !frozen) {
     let msg='';
     if (avail<=0) msg=`Fixed Commitments (${fmt(fixed)}) exceed your income. Please review.`;
-    else if (vari===0) msg=`After non-negotiables, you have ${fmt(avail)} available for variable expenses.`;
+    else if (vari===0) msg=`After Fixed Commitments, you have ${fmt(avail)} available for Planned Spending.`;
     else if (rem<0) msg=`Planned Spending exceed available budget by ${fmt(Math.abs(rem))}. Consider reducing.`;
     else if (rem<avail*0.05) msg=`Excellent — only ${fmt(rem)} unallocated. Budget is nearly fully planned.`;
     else { const pct=Math.round(vari/avail*100); msg=`${pct}% of available budget allocated. ${fmt(rem)} still unallocated.`; }
@@ -635,12 +719,13 @@ function renderPlan() {
   // Fixed Commitments
   html+=`<div class="card">
     <div class="card-header"><span class="card-title">Fixed Commitments</span><span class="card-total">${fmt(fixed)}</span></div>`;
-  monthlyFixed(b).forEach(e=>{
+  monthlyFixed(b).forEach((e,i)=>{
     html+=`<div class="exp-row">
-      <div><div class="exp-name">${e.name}</div>${e.date?`<div class="exp-date">Due ${e.date}</div>`:''}</div>
+      <div><div class="exp-name">${esc(e.name)}</div>${e.date?`<div class="exp-date">Due ${esc(e.date)}</div>`:''}</div>
       <div class="exp-badge-amt">
         <span class="badge badge-fixed">Fixed</span>
         <span class="exp-amt">${fmt(e.amount)}</span>
+        ${!frozen?`<button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="openFixedMenu(${i})">⋮</button>`:''}
       </div>
     </div>`;
   });
@@ -650,7 +735,7 @@ function renderPlan() {
   html+=`<div class="card">
     <div class="card-header"><span class="card-title">Planned Spending</span><span class="card-total">${fmt(vari)}</span></div>`;
   const vars=b.variableExpenses||[];
-  if (!vars.length) html+=`<div class="empty">No variable expenses yet.<br>Add CC payments, home expenses, etc.</div>`;
+  if (!vars.length) html+=`<div class="empty">No Planned Spending yet.<br>Add CC payments, home expenses, etc.</div>`;
   vars.forEach((e,i)=>{
     html+=`<div class="exp-row" style="grid-template-columns:1fr auto;">
       <div><div class="exp-name">${e.name}</div>${e.date?`<div class="exp-date">Due ${e.date}</div>`:''}</div>
@@ -667,7 +752,7 @@ function renderPlan() {
              </div>`
         }
         ${e.isCC&&!frozen ? `<button class="btn btn-cc" onclick="openCC(${i})">CC</button>` : ''}
-        ${!frozen ? `<button class="btn btn-ghost-red" onclick="removeVar(${i})">✕</button>` : ''}
+        ${!frozen ? `<button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="openVarMenu(${i})">⋮</button>` : ''}
       </div>
     </div>`;
   });
@@ -694,7 +779,7 @@ function renderPlan() {
   document.getElementById('tab-plan').innerHTML = html;
 }
 
-// ─── INCOME ───────────────────────────────────────────────────────────────────
+// ─── FUNDING SOURCES ───────────────────────────────────────────────────────────────────
 function setIncome(field, val) {
   const b=B();
   const resolved = evalFormula(val);
@@ -720,7 +805,7 @@ function varInputChange(i, raw) {
 function varInputCommit(i, raw) {
   const b=B();
   const val = evalFormula(raw);
-  b.variableExpenses[i].rawInput = String(val);
+  b.variableExpenses[i].rawInput = String(raw || '');
   b.variableExpenses[i].amount = val;
   b.tallyApproved=false;
   document.getElementById('save-btn').disabled=true;
@@ -794,10 +879,73 @@ function applyCC(raw) {
   saveS(); renderPlan();
 }
 
+
+function fundingInputChange(i, raw){
+  const hint=document.getElementById('fsource-hint-'+i);
+  const preview=formulaPreview(raw);
+  if(hint){ hint.textContent=preview?'= '+preview:''; hint.style.display=preview?'block':'none'; }
+}
+function fundingInputCommit(i, raw){
+  const b=B(), f=fundingSnapshot(b)[i];
+  if(!f)return;
+  f.rawInput=String(raw||'');
+  f.amount=evalFormula(raw||'0');
+  b.tallyApproved=false;
+  saveS(); renderPlan();
+}
+
+function openFixedMenu(i){
+  const e=monthlyFixed(B())[i];
+  if(!e)return;
+  document.getElementById('action-title').textContent=e.name;
+  document.getElementById('action-content').innerHTML=`
+    <div class="setting-label">Amount</div>
+    <input type="text" id="action-amount" style="width:100%;" value="${esc(e.rawInput || e.amount || '')}" placeholder="Amount or =expression"
+      oninput="actionFormulaHint()">
+    <div class="formula-hint" id="action-hint"></div>`;
+  document.getElementById('action-btns').innerHTML=`
+    <button class="btn btn-outline" style="flex:1;" onclick="closeActionMenu()">Cancel</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="saveFixedMenu(${i})">Save</button>`;
+  document.getElementById('action-modal').style.display='flex';
+}
+function saveFixedMenu(i){
+  const e=monthlyFixed(B())[i], raw=document.getElementById('action-amount').value;
+  e.rawInput=String(raw||''); e.amount=evalFormula(raw||'0');
+  B().tallyApproved=false; closeActionMenu(); saveS(); renderPlan();
+}
+function openVarMenu(i){
+  const e=B().variableExpenses[i];
+  document.getElementById('action-title').textContent=e.name;
+  document.getElementById('action-content').innerHTML=`
+    <div class="setting-label">Amount</div>
+    <input type="text" id="action-amount" style="width:100%;" value="${esc(e.rawInput || e.amount || '')}" placeholder="Amount or =expression"
+      oninput="actionFormulaHint()">
+    <div class="formula-hint" id="action-hint"></div>
+    <div class="setting-note">Changes apply only to ${monthLabel(S.currentKey)}.</div>`;
+  document.getElementById('action-btns').innerHTML=`
+    <button class="btn btn-outline" style="flex:1;" onclick="closeActionMenu()">Cancel</button>
+    <button class="btn btn-outline" style="flex:1;color:var(--red);" onclick="removeVarFromMenu(${i})">Remove</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="saveVarMenu(${i})">Save</button>`;
+  document.getElementById('action-modal').style.display='flex';
+}
+function saveVarMenu(i){
+  const e=B().variableExpenses[i], raw=document.getElementById('action-amount').value;
+  e.rawInput=String(raw||''); e.amount=evalFormula(raw||'0');
+  B().tallyApproved=false; closeActionMenu(); saveS(); renderPlan();
+}
+function removeVarFromMenu(i){ removeVar(i); closeActionMenu(); }
+function actionFormulaHint(){
+  const raw=document.getElementById('action-amount')?.value||'';
+  const hint=document.getElementById('action-hint');
+  const p=formulaPreview(raw);
+  if(hint){hint.textContent=p?'= '+p:'';hint.style.display=p?'block':'none';}
+}
+function closeActionMenu(){document.getElementById('action-modal').style.display='none';}
+
 // ─── FREEZE ───────────────────────────────────────────────────────────────────
 function confirmFreeze() {
   const b=B();
-  if (!b.tallyApproved) { toast('Run Tally first before freezing','warn'); return; }
+  if (!b.tallyApproved) { toast('Review the budget before finalizing','warn'); return; }
   b.frozen=true; saveS(); renderAll();
   toast(`Budget finalized for ${monthLabel(S.currentKey)} 🔒`,'ok');
 }
@@ -840,7 +988,7 @@ function runTally() {
   const cls=diff===0?'tally-ok':diff<0?'tally-over':'tally-under';
   const diffLabel=diff===0?'✓ Perfectly balanced':diff<0?`▲ Over budget by ${fmt(Math.abs(diff))}`:`${fmt(diff)} unallocated`;
   let advice='';
-  if (diff<0) advice=`You are over by ${fmt(Math.abs(diff))}. Reduce variable expenses to balance. Fixed Commitments cannot be changed.`;
+  if (diff<0) advice=`You are over by ${fmt(Math.abs(diff))}. Reduce Planned Spending to balance. Fixed Commitments are locked for this month.`;
   else if (diff===0) advice='Every rupee is accounted for. Budget is perfectly balanced.';
   else if (diff<income*0.05) advice=`Almost fully allocated — ${fmt(diff)} left. You may top up a variable item or carry it forward.`;
   else advice=`${fmt(diff)} is unallocated. Consider adding it to a variable category or treating it as savings.`;
@@ -861,7 +1009,7 @@ function runTally() {
     <div class="tally-msg">${advice}</div>
     <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin:12px 0 8px;">Variable breakdown</div>
     <div class="tally-card">
-      ${varRows||'<div class="empty" style="padding:14px;">No variable expenses</div>'}
+      ${varRows||'<div class="empty" style="padding:14px;">No Planned Spending</div>'}
     </div>`;
 
   document.getElementById('tally-content').innerHTML=html;
@@ -876,13 +1024,13 @@ function approveTally() {
   const b=B(); b.tallyApproved=true; saveS();
   document.getElementById('save-btn').disabled=false;
   document.getElementById('tally-modal').style.display='none';
-  toast('Tally approved — you can now save or freeze','ok');
+  toast('Budget review approved — you can now save or freeze','ok');
 }
 
 // ─── SAVE TO SHEETS ───────────────────────────────────────────────────────────
 async function trySave() {
   const b=B();
-  if (!b.tallyApproved&&!b.frozen) { toast('Run Tally first','warn'); return; }
+  if (!b.tallyApproved&&!b.frozen) { toast('Review the budget first','warn'); return; }
   if (!S.webhookUrl) { toast('Add your Apps Script URL in Settings','warn'); return; }
   const btn=document.getElementById('save-btn');
   btn.textContent='Saving…'; btn.disabled=true;
@@ -893,7 +1041,7 @@ async function trySave() {
   const rows=[
     [`BUDGET — ${label}`, b.frozen?'FROZEN':'DRAFT','',''],
     ['','','',''],
-    ['INCOME','','',''],
+    ['FUNDING SOURCES','','',''],
     ['HDFC','',b.hdfc||0,''],
     ['Bank of Maharashtra','',b.bom||0,''],
     ['SBI','',b.sbi||0,''],
@@ -902,11 +1050,11 @@ async function trySave() {
     ['','','',''],
     ['FIXED COMMITMENTS','Amount','Due',''],
     ...monthlyFixed(b).map(e=>[e.name,e.amount,e.date||'','Fixed']),
-    ['Non-Negotiables Total',fixed,'',''],
+    ['Fixed Commitments Total',fixed,'',''],
     ['','','',''],
-    ['VARIABLE EXPENSES','Amount','Due','Type'],
+    ['PLANNED SPENDING','Amount','Due','Type'],
     ...(b.variableExpenses||[]).map(e=>[e.name,e.amount||0,e.date||'',e.isCC?'CC':'Variable']),
-    ['Variable Total',vari,'',''],
+    ['Planned Spending Total',vari,'',''],
     ['','','',''],
     ['TOTAL OUTGOING',fixed+vari,'',''],
     ['REMAINING',income-fixed-vari,'',''],
@@ -1068,211 +1216,227 @@ function fetchViaScript(url) {
 
 // ─── SETTINGS ────────────────────────────────────────────────────────────────
 function renderSettings() {
-  let fixedRows='';
-  S.fixedExpenses.forEach((e,i)=>{
-    fixedRows+=`<div class="exp-row">
-      <div><div class="exp-name">${e.name}</div>${e.date?`<div class="exp-date">Due ${e.date}</div>`:''}</div>
+  const fixedRows=(S.fixedExpenses||[]).map((e,i)=>`
+    <div class="exp-row">
+      <div><div class="exp-name">${esc(e.name)}</div>${e.date?`<div class="exp-date">Due ${esc(e.date)}</div>`:''}</div>
       <div class="exp-badge-amt">
-        <input type="number" value="${e.amount}" style="width:110px;font-size:14px;text-align:right;" onchange="updateFixed(${i},this.value)" />
-        <button class="btn btn-ghost-red" onclick="removeFixed(${i})">✕</button>
+        <span class="exp-amt">${fmt(e.amount)}</span>
+        <button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="editFixedMaster(${i})">⋮</button>
       </div>
-    </div>`;
-  });
+    </div>`).join('');
+
+  const sourceRows=(S.fundingSources||[]).map((e,i)=>`
+    <div class="exp-row">
+      <div class="exp-name">${esc(e.name)}</div>
+      <button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="editFundingMaster(${i})">⋮</button>
+    </div>`).join('');
+
+  const varRows=(S.varExpenseTemplates||[]).map((e,i)=>`
+    <div class="exp-row">
+      <div><div class="exp-name">${esc(e.name)}</div>${e.date?`<div class="exp-date">Due ${esc(e.date)}</div>`:''}</div>
+      <div class="exp-badge-amt">
+        ${e.isCC?'<span class="badge badge-cc">CC</span>':''}
+        <button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="editVarMaster(${i})">⋮</button>
+      </div>
+    </div>`).join('');
+
+  const catRows=(S.categories||[]).map((e,i)=>`
+    <div class="exp-row">
+      <div class="exp-name">${esc(e.name)}</div>
+      <button class="btn btn-outline" style="padding:6px 9px;font-size:16px;" onclick="removeCategory(${i})">✕</button>
+    </div>`).join('');
 
   const scriptCode = `function doPost(e) {
   try {
-    var raw = '{}';
-    if (e && e.parameter && e.parameter.payload) {
-      raw = e.parameter.payload;
-    } else if (e && e.postData && e.postData.contents) {
-      raw = e.postData.contents;
-    }
+    var raw = e && e.parameter && e.parameter.payload ? e.parameter.payload : '{}';
     var data = JSON.parse(raw);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    var sheetName = data.month;
-    if (!sheetName) return ContentService.createTextOutput('{"status":"no month"}').setMimeType(ContentService.MimeType.JSON);
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) sheet = ss.insertSheet(sheetName);
+    var sheet = ss.getSheetByName(data.month);
+    if (!sheet) sheet = ss.insertSheet(data.month);
     sheet.clearContents();
-    data.rows.forEach(function(row, i) {
+    (data.rows || []).forEach(function(row, i) {
       sheet.getRange(i+1,1,1,row.length).setValues([row]);
     });
-
-    if (data.snapshot) {
-      var ds = ss.getSheetByName('_data');
-      if (!ds) ds = ss.insertSheet('_data');
-      ds.clearContents();
-      ds.getRange(1,1).setValue(JSON.stringify(data.snapshot));
+    if (data.summary) {
+      var s = ss.getSheetByName('Summary');
+      if (!s) s = ss.insertSheet('Summary');
+      var values = data.summary;
+      if (values.length) s.getRange(1,1,values.length,values[0].length).setValues(values);
     }
-
-    return ContentService
-      .createTextOutput(JSON.stringify({status:'ok'}))
+    return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
       .setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({status:'error',message:err.toString()}))
+    return ContentService.createTextOutput(JSON.stringify({status:'error',message:String(err)}))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
-
 function doGet(e) {
-  var action = e && e.parameter ? e.parameter.action : '';
-  var callback = e && e.parameter ? e.parameter.callback : 'onSheetsData';
-  if (action === 'load') {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var ds = ss.getSheetByName('_data');
-    var json = '{}';
-    if (ds) json = ds.getRange(1,1).getValue();
-    return ContentService
-      .createTextOutput(callback + '(' + json + ')')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService
-    .createTextOutput(JSON.stringify({status:'ok'}))
+  return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
 
-  // Variable expense templates rows
-  let varTemplateRows='';
-  S.varExpenseTemplates.forEach((e,i)=>{
-    varTemplateRows+=`<div class="exp-row">
-      <div><div class="exp-name">${e.name}</div>${e.date?`<div class="exp-date">Due ${e.date}</div>`:''}</div>
-      <div class="exp-badge-amt">
-        <span class="badge badge-var">Variable</span>
-        ${e.isCC?'<span class="badge badge-cc" style="font-size:11px;background:var(--red-bg);color:var(--red-text)">CC</span>':''}
-        <button class="btn btn-ghost-red" onclick="removeVarTemplate(${i})">✕</button>
-      </div>
-    </div>`;
-  });
-
   document.getElementById('tab-settings').innerHTML=`
     <div class="card">
-      <div class="card-header"><span class="card-title">Google Sheets</span></div>
-      <div class="setting-block">
-        <div class="setting-label">Apps Script Web App URL</div>
-        <input type="text" id="webhook-input" style="width:100%;" value="${S.webhookUrl||''}" placeholder="https://script.google.com/macros/s/…/exec" />
-        <button class="btn btn-primary btn-full" onclick="saveWebhook()" style="margin-top:10px;">Save URL</button>
-        <button class="btn btn-outline btn-full" id="test-btn" onclick="testConnection()" style="margin-top:8px;">Test connection</button>
-      </div>
-      <div class="setting-block">
-        <div class="setting-label" style="font-weight:600;">One-time setup instructions</div>
-        <div class="setting-note">
-          1. Open your Google Sheet<br>
-          2. Click <strong>Extensions → Apps Script</strong><br>
-          3. Delete existing code, paste the script below<br>
-          4. Click <strong>Deploy → New deployment → Web app</strong><br>
-          5. Set "Who has access" → <strong>Anyone</strong><br>
-          6. Click Deploy, copy the URL, paste it above
-        </div>
-        <div class="setting-label" style="margin-top:12px;">Script to paste:</div>
-        <div class="code-box">${scriptCode}</div>
+      <div class="card-header"><span class="card-title">Funding Sources</span></div>
+      ${sourceRows||'<div class="empty">No funding sources.</div>'}
+      <div class="add-form">
+        <input type="text" id="fs-name" placeholder="Source name">
+        <button class="btn btn-primary" onclick="addFundingMaster()">Add</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-header">
-        <span class="card-title">Fixed Commitments</span>
-        <span class="card-total">${fmt(totalFixed())}</span>
-      </div>
-      ${fixedRows}
+      <div class="card-header"><span class="card-title">Fixed Commitments</span><span class="card-total">${fmt((S.fixedExpenses||[]).reduce((a,e)=>a+Number(e.amount||0),0))}</span></div>
+      ${fixedRows||'<div class="empty">No fixed commitments.</div>'}
       <div class="add-form">
-        <input type="text" id="nf-name" placeholder="Expense name" style="flex:1;" />
-        <input type="number" id="nf-amt" placeholder="Amount" style="width:100px;" />
-        <select id="nf-date" style="width:72px;">
-          <option value="">Day</option>
-          ${Array.from({length:31},(_,i)=>`<option value="${i+1}th">${i+1}</option>`).join('')}
-        </select>
+        <input type="text" id="nf-name" placeholder="Commitment name">
+        <input type="text" id="nf-amt" placeholder="Amount or =expr" style="width:130px;">
+        <select id="nf-date" style="width:72px;"><option value="">Day</option>${Array.from({length:31},(_,i)=>`<option value="${i+1}th">${i+1}</option>`).join('')}</select>
         <button class="btn btn-primary" onclick="addFixed()">Add</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-header">
-        <span class="card-title">Recurring Spending</span>
-        <span style="font-size:12px;color:var(--text3)">Names carry to new months</span>
-      </div>
-      <div style="font-size:12px;color:var(--text3);padding:10px 16px;border-bottom:1px solid var(--border)">
-        Add your recurring variable expenses here. Each new month copies the names with blank amounts for you to fill in.
-      </div>
-      ${varTemplateRows||'<div style="font-size:13px;color:var(--text3);padding:14px 16px;">No templates yet. Add below.</div>'}
+      <div class="card-header"><span class="card-title">Recurring Spending</span></div>
+      ${varRows||'<div class="empty">No recurring spending.</div>'}
       <div class="add-form">
-        <input type="text" id="vt-name" placeholder="Expense name" style="flex:1;" />
-        <select id="vt-date" style="width:72px;">
-          <option value="">Day</option>
-          ${Array.from({length:31},(_,i)=>'<option value="'+i+1+'th">'+i+1+'</option>').join('')}
-        </select>
-        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text2);cursor:pointer;white-space:nowrap;">
-          <input type="checkbox" id="vt-cc" style="width:16px;height:16px;accent-color:var(--accent);" /> CC
-        </label>
+        <input type="text" id="vt-name" placeholder="Expense name">
+        <input type="text" id="vt-amt" placeholder="Default amount or =expr" style="width:130px;">
+        <select id="vt-date" style="width:72px;"><option value="">Day</option>${Array.from({length:31},(_,i)=>`<option value="${i+1}th">${i+1}</option>`).join('')}</select>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text2);"><input type="checkbox" id="vt-cc"> CC</label>
         <button class="btn btn-primary" onclick="addVarTemplate()">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Categories</span></div>
+      ${catRows||'<div class="empty">No categories yet.</div>'}
+      <div class="add-form">
+        <input type="text" id="cat-name" placeholder="Category name">
+        <button class="btn btn-primary" onclick="addCategory()">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Google Sheets</span></div>
+      <div class="setting-block">
+        <div class="setting-label">Apps Script Web App URL</div>
+        <input type="text" id="webhook-input" style="width:100%;" value="${esc(S.webhookUrl||'')}" placeholder="https://script.google.com/macros/s/…/exec">
+        <button class="btn btn-primary btn-full" onclick="saveWebhook()" style="margin-top:10px;">Save URL</button>
+        <button class="btn btn-outline btn-full" id="test-btn" onclick="testConnection()" style="margin-top:8px;">Test connection</button>
+        <div class="setting-note">Updates the existing monthly tab in your existing spreadsheet. A tab is created only when that month does not already exist.</div>
+      </div>
+      <div class="setting-block">
+        <div class="setting-label">One-time setup</div>
+        <div class="setting-note">Paste the Apps Script below into the Apps Script project attached to your existing spreadsheet and deploy it as a Web App. The spreadsheet remains the reporting layer; Supabase remains the application data store.</div>
+        <div class="code-box">${esc(scriptCode)}</div>
       </div>
     </div>`;
 }
 
 function saveWebhook() {
   S.webhookUrl=document.getElementById('webhook-input').value.trim();
-  saveS(); toast('Apps Script URL saved','ok');
+  saveS(); toast('Google Sheets connection saved','ok');
+}
+
+function addFundingMaster(){
+  const name=document.getElementById('fs-name').value.trim();
+  if(!name){toast('Enter a source name','warn');return;}
+  S.fundingSources.push({id:'local-'+Date.now(),name,sortOrder:S.fundingSources.length});
+  saveS();renderSettings();
+}
+function editFundingMaster(i){
+  const e=S.fundingSources[i]; if(!e)return;
+  openMasterAction('Funding Source',e.name,'',raw=>{
+    const n=String(raw).trim(); if(!n)return;
+    e.name=n;
+    // Existing monthly snapshots remain unchanged.
+    saveS();renderSettings();
+  },()=>{ S.fundingSources.splice(i,1); saveS();renderSettings(); });
+}
+
+function editFixedMaster(i){
+  const e=S.fixedExpenses[i]; if(!e)return;
+  openMasterAmountAction('Fixed Commitment',e.name,e.amount,e.rawInput||'',(name,raw)=>{
+    e.name=name; e.rawInput=raw; e.amount=evalFormula(raw||'0');
+    saveS();renderSettings();
+  },()=>{ S.fixedExpenses.splice(i,1); saveS();renderSettings(); });
+}
+function addFixed() {
+  const name=document.getElementById('nf-name').value.trim();
+  const raw=document.getElementById('nf-amt').value.trim();
+  const date=document.getElementById('nf-date').value;
+  if(!name||!raw){toast('Enter name and amount','warn');return;}
+  const amt=evalFormula(raw);
+  S.fixedExpenses.push({id:'local-'+Date.now(),name,amount:amt,rawInput:raw,date});
+  saveS(); renderSettings();
+}
+
+function editVarMaster(i){
+  const e=S.varExpenseTemplates[i]; if(!e)return;
+  openMasterAmountAction('Recurring Spending',e.name,e.amount,e.rawInput||'',(name,raw)=>{
+    e.name=name; e.rawInput=raw; e.amount=evalFormula(raw||'0');
+    saveS();renderSettings();
+  },()=>{ S.varExpenseTemplates.splice(i,1); saveS();renderSettings(); });
 }
 function addVarTemplate() {
   const name=document.getElementById('vt-name').value.trim();
+  const raw=document.getElementById('vt-amt').value.trim();
   const date=document.getElementById('vt-date').value;
   const isCC=document.getElementById('vt-cc').checked;
   if(!name){toast('Enter an expense name','warn');return;}
-  if(!S.varExpenseTemplates)S.varExpenseTemplates=[];
-  S.varExpenseTemplates.push({name,date,isCC});
-  document.getElementById('vt-name').value='';
-  saveS();renderSettings();
-  toast(name+' added to templates','ok');
-}
-function removeVarTemplate(i) {
-  S.varExpenseTemplates.splice(i,1);
+  const amt=evalFormula(raw||'0');
+  S.varExpenseTemplates.push({id:'local-'+Date.now(),name,date,isCC,amount:amt,rawInput:raw});
   saveS();renderSettings();
 }
 
-async function testConnection() {
-  const url = S.webhookUrl;
-  if (!url) { toast('Paste your URL first','warn'); return; }
-  const btn = document.getElementById('test-btn');
-  btn.textContent = 'Testing…'; btn.disabled = true;
-
-  // Test 1: simple GET ping
-  try {
-    const r = await fetch(url + '?action=ping', { method:'GET', mode:'no-cors' });
-    // opaque response means it reached the server
-    console.log('GET reached server (opaque ok)');
-  } catch(e) {
-    toast('Cannot reach the URL at all — check the URL is correct','err');
-    btn.textContent = 'Test connection'; btn.disabled = false;
-    return;
-  }
-
-  // Test 2: POST with fetch no-cors
-  try {
-    await fetch(url, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'payload=' + encodeURIComponent(JSON.stringify({month:'TEST', rows:[['TEST','OK','','']], snapshot:null}))
-    });
-    toast('Test sent! Check your Sheet for a tab named TEST — if it appears, everything works ✓','ok');
-  } catch(e) {
-    toast('POST failed: ' + e.message,'err');
-  }
-  btn.textContent = 'Test connection'; btn.disabled = false;
+function addCategory(){
+  const name=document.getElementById('cat-name').value.trim();
+  if(!name){toast('Enter a category name','warn');return;}
+  S.categories.push({id:'local-'+Date.now(),name,sortOrder:S.categories.length});
+  saveS();renderSettings();
 }
-function updateFixed(i,val) { S.fixedExpenses[i].amount=parseFloat(val)||0; saveS(); renderPlan(); renderSettings(); }
-function removeFixed(i) { S.fixedExpenses.splice(i,1); saveS(); renderPlan(); renderSettings(); }
-function addFixed() {
-  const name=document.getElementById('nf-name').value.trim();
-  const amt=parseFloat(document.getElementById('nf-amt').value)||0;
-  const date=document.getElementById('nf-date').value;
-  if(!name||!amt){toast('Enter name and amount','warn');return;}
-  S.fixedExpenses.push({id:Date.now(),name,amount:amt,date});
-  document.getElementById('nf-name').value='';
-  document.getElementById('nf-amt').value='';
-  saveS(); renderPlan(); renderSettings();
+function removeCategory(i){S.categories.splice(i,1);saveS();renderSettings();}
+
+function openMasterAction(title,name,amount,onSave,onRemove){
+  document.getElementById('action-title').textContent=title;
+  document.getElementById('action-content').innerHTML=`
+    <div class="setting-label">Name</div>
+    <input type="text" id="master-name" style="width:100%;" value="${esc(name)}">
+    <div class="setting-note">Changes apply to future months. Existing month snapshots are unchanged.</div>`;
+  document.getElementById('action-btns').innerHTML=`
+    <button class="btn btn-outline" style="flex:1;" onclick="closeActionMenu()">Cancel</button>
+    <button class="btn btn-outline" style="flex:1;color:var(--red);" onclick="masterRemove()">Archive / Remove</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="masterSave()">Save</button>`;
+  window.__masterSave=()=>onSave(document.getElementById('master-name').value);
+  window.__masterRemove=onRemove;
+  document.getElementById('action-modal').style.display='flex';
 }
+function openMasterAmountAction(title,name,amount,raw,onSave,onRemove){
+  document.getElementById('action-title').textContent=title;
+  document.getElementById('action-content').innerHTML=`
+    <div class="setting-label">Name</div>
+    <input type="text" id="master-name" style="width:100%;" value="${esc(name)}">
+    <div class="setting-label" style="margin-top:12px;">Default amount</div>
+    <input type="text" id="master-amount" style="width:100%;" value="${esc(raw || amount || '')}" placeholder="Amount or =expression" oninput="masterFormulaHint()">
+    <div class="formula-hint" id="master-hint"></div>
+    <div class="setting-note">Changes apply to future months. Existing month snapshots are unchanged.</div>`;
+  document.getElementById('action-btns').innerHTML=`
+    <button class="btn btn-outline" style="flex:1;" onclick="closeActionMenu()">Cancel</button>
+    <button class="btn btn-outline" style="flex:1;color:var(--red);" onclick="masterRemove()">Archive / Remove</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="masterSaveAmount()">Save</button>`;
+  window.__masterSaveAmount=()=>onSave(document.getElementById('master-name').value,document.getElementById('master-amount').value);
+  window.__masterRemove=onRemove;
+  document.getElementById('action-modal').style.display='flex';
+}
+function masterSave(){ if(window.__masterSave)window.__masterSave(); closeActionMenu(); }
+function masterSaveAmount(){ if(window.__masterSaveAmount)window.__masterSaveAmount(); closeActionMenu(); }
+function masterRemove(){ if(window.__masterRemove)window.__masterRemove(); closeActionMenu(); }
+function masterFormulaHint(){
+  const raw=document.getElementById('master-amount')?.value||'', p=formulaPreview(raw), h=document.getElementById('master-hint');
+  if(h){h.textContent=p?'= '+p:'';h.style.display=p?'block':'none';}
+}
+
 
 // ─── MONTH MANAGEMENT ────────────────────────────────────────────────────────
 function openMonthPicker() {
@@ -1297,13 +1461,11 @@ function loadMonth(key) {
   renderAll();
 }
 
-function createNewMonth() {
+async function createNewMonth() {
   const keys=Object.keys(S.budgets).sort();
   let next;
-  let prevKey=null;
   if(keys.length){
     const last=keys[keys.length-1];
-    prevKey=last;
     const [y,m]=last.split('-').map(Number);
     const d=new Date(y,m,1);
     next=monthKey(d.getFullYear(),d.getMonth());
@@ -1311,30 +1473,24 @@ function createNewMonth() {
     const now=new Date();
     next=monthKey(now.getFullYear(),now.getMonth());
   }
-  if(!S.budgets[next]){
-    const budget=emptyBudget(next);
-    // Carry forward variable expense names from previous month (amounts blank)
-    if(prevKey && S.budgets[prevKey]){
-      const prevVars=S.budgets[prevKey].variableExpenses||[];
-      budget.variableExpenses=prevVars.map(e=>({
-        name:e.name,
-        amount:0,
-        rawInput:'',
-        date:e.date||'',
-        isCC:e.isCC||false
-      }));
-    } else if(S.varExpenseTemplates && S.varExpenseTemplates.length){
-      // Use templates from settings if no previous month
-      budget.variableExpenses=S.varExpenseTemplates.map(e=>({
-        name:e.name,amount:0,rawInput:'',date:e.date||'',isCC:e.isCC||false
-      }));
-    }
-    S.budgets[next]=budget;
+
+  if(S.budgets[next]){
+    S.currentKey=next;
+    document.getElementById('mpicker-modal').style.display='none';
+    renderAll();
+    return;
   }
-  S.currentKey=next; saveS();
-  document.getElementById('mpicker-modal').style.display='none';
-  renderAll();
-  toast(`Created ${monthLabel(next)}`,'ok');
+
+  try{
+    await createBudgetInDb(next);
+    S.currentKey=next;
+    document.getElementById('mpicker-modal').style.display='none';
+    renderAll();
+    toast(`Created ${monthLabel(next)} from current masters`,'ok');
+  }catch(e){
+    console.error(e);
+    toast('Could not create month: '+e.message,'err');
+  }
 }
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────
