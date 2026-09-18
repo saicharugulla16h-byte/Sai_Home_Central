@@ -280,13 +280,13 @@ select:focus { border-color: var(--accent); }
 </div>
 
 <!-- Authentication -->
-<div class="modal-overlay" id="auth-modal" style="display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:1000;">
+<div class="modal-overlay" id="auth-modal" style="display:none;align-items:center;justify-content:center;background:var(--bg);z-index:1000;">
   <div class="modal-sheet" style="border-radius:var(--radius);max-width:420px;margin:18px;padding:28px 22px;box-shadow:var(--shadow);">
     <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px;">Budget Planner</div>
     <h2>Sign in</h2>
-    <p>Use your email to access your budget securely across devices.</p>
+    <p>Authentication is temporarily disabled. Your budget is stored locally in this browser.</p>
     <input type="email" id="auth-email" style="width:100%;" placeholder="you@example.com" autocomplete="email" />
-    <button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="sendMagicLink()" id="auth-btn">Send sign-in link</button>
+    <button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="sendMagicLink()" id="auth-btn">Sign in (later)</button>
     <div id="auth-msg" style="font-size:12px;color:var(--text2);margin-top:12px;line-height:1.5;"></div>
   </div>
 </div>
@@ -380,12 +380,16 @@ function monthLabel(key) {
 
 // ─── PERSISTENCE / SUPABASE ───────────────────────────────────────────────────
 function saveS() {
-  if (!AUTH_USER || DB_LOADING) return;
   clearTimeout(DB_SAVE_TIMER);
-  DB_SAVE_TIMER = setTimeout(() => persistCurrentState().catch(e => {
-    console.error(e);
-    toast('Could not save changes to Supabase','err');
-  }), 250);
+  saveLocalState();
+  DB_SAVE_TIMER = setTimeout(() => {
+    if (AUTH_USER?.id && AUTH_USER.id !== 'local-user') {
+      persistCurrentState().catch(e => {
+        console.error(e);
+        toast('Could not save changes to Supabase','err');
+      });
+    }
+  }, 250);
 }
 
 function emptyBudget(key) {
@@ -402,9 +406,9 @@ async function sendMagicLink() {
     email,
     options:{emailRedirectTo:'https://saicharugulla16h-byte.github.io/Sai_Home_Central/index_v2.html'}
   });
-  if(error){ msg.textContent=error.message; btn.disabled=false; btn.textContent='Send sign-in link'; return; }
+  if(error){ msg.textContent=error.message; btn.disabled=false; btn.textContent='Sign in (later)'; return; }
   msg.textContent='Sign-in link sent. Check your email, then return to this page.';
-  btn.disabled=false; btn.textContent='Send sign-in link';
+  btn.disabled=false; btn.textContent='Sign in (later)';
 }
 
 function showAuth(show) {
@@ -551,7 +555,7 @@ async function replaceBudgetChildren(b){
 }
 
 async function persistCurrentState(){
-  if(!AUTH_USER||!DB_READY)return;
+  if(!AUTH_USER||!DB_READY||AUTH_USER.id==='local-user')return;
   const b=B();
 
   const masterTables = [
@@ -592,16 +596,66 @@ async function persistCurrentState(){
 }
 
 async function init() {
-  const {data:{session}}=await supabaseClient.auth.getSession();
-  if(session){ AUTH_USER=session.user; showAuth(false); try{ await loadRemoteState(); }catch(e){ console.error(e); showAuth(false); toast('Could not load your budget data: '+e.message,'err'); } }
-  else showAuth(true);
-  supabaseClient.auth.onAuthStateChange(async (_event,session2)=>{
-    if(session2?.user && !AUTH_USER){ AUTH_USER=session2.user; showAuth(false); try{await loadRemoteState();}catch(e){console.error(e);toast('Could not load budget data','err');} }
-    else if(!session2){ AUTH_USER=null; DB_READY=false; showAuth(true); }
-  });
+  // Authentication is intentionally disabled for V2 for now.
+  // The Supabase schema/CRUD code remains in place and can be re-enabled later.
+  AUTH_USER = { id: 'local-user', email: 'local@budget-planner' };
+  DB_READY = false;
+
+  const saved = localStorage.getItem('budgetPlannerV2Local');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      S = Object.assign(S, parsed);
+    } catch(e) {
+      console.warn('Could not load local budget data', e);
+    }
+  }
+
+  if (!S.fixedExpenses?.length) S.fixedExpenses = defaultFixed();
+  if (!S.fundingSources?.length) {
+    S.fundingSources = ['HDFC','Bank of Maharashtra','SBI','ICICI']
+      .map((name,i)=>({id:'local-fs-'+i,name,sortOrder:i}));
+  }
+  if (!S.categories) S.categories = [];
+  if (!S.varExpenseTemplates) S.varExpenseTemplates = [];
+
+  const now = new Date();
+  const key = monthKey(now.getFullYear(), now.getMonth());
+
+  if (!S.budgets[key]) {
+    S.budgets[key] = emptyBudget(key);
+    S.budgets[key].fundingSnapshot = S.fundingSources.map((e,i)=>({
+      sourceId:e.id,name:e.name,amount:0,rawInput:'',sortOrder:i
+    }));
+    S.budgets[key].fixedSnapshot = S.fixedExpenses.map(e=>({
+      name:e.name,amount:Number(e.amount||0),rawInput:e.rawInput||'',date:e.date||'',id:null
+    }));
+    S.budgets[key].variableExpenses = S.varExpenseTemplates.map(e=>({
+      name:e.name,amount:0,rawInput:'',date:e.date||'',isCC:!!e.isCC,category:e.category||''
+    }));
+    S.currentKey = key;
+  }
+
+  DB_READY = true;
+  showAuth(false);
+  renderAll();
 }
 
-
+function saveLocalState() {
+  try {
+    localStorage.setItem('budgetPlannerV2Local', JSON.stringify({
+      currentKey:S.currentKey,
+      budgets:S.budgets,
+      fixedExpenses:S.fixedExpenses,
+      varExpenseTemplates:S.varExpenseTemplates,
+      fundingSources:S.fundingSources,
+      categories:S.categories,
+      webhookUrl:S.webhookUrl||''
+    }));
+  } catch(e) {
+    console.warn('Could not save local state', e);
+  }
+}
 
 // ─── MATHS ───────────────────────────────────────────────────────────────────
 function esc(v) {
@@ -1063,7 +1117,7 @@ async function trySave() {
     // Use a hidden form POST — bypasses CORS entirely, works on all browsers
     await postViaForm(S.webhookUrl, {month:label, rows, snapshot});
     toast(`✓ Saved to Google Sheets — ${label}`,'ok');
-    btn.textContent='Saved ✓';
+    btn.textContent='Saved locally ✓';
   } catch(e) {
     toast('Could not reach Sheets. Check your Apps Script URL.','err');
     btn.textContent='Update Sheets Now'; btn.disabled=false;
